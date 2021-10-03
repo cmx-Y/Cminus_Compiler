@@ -4,4 +4,4 @@ cd ./build/
 make clean
 make
 cd ..
-./build/lexer ./tests/parser/easy/FAIL_id.cminus
+./build/lexer ./tests/parser/easy/mytest.cminus

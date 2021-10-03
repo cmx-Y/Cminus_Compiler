@@ -40,20 +40,17 @@ syntax_tree_node *node(const char *node_name, int children_num, ...);
 
 /* TODO: Your tokens here. */
 %token <node> ERROR
-%token <node> ADD
 %token <node> INT FLOAT
-%token <node> IF
-%token <node> ELSE
-%token <node> RETURN
-%token <node> WHILE
+%token <node> IF ELSE
+%token <node> RETURN VOID WHILE
+%token <node> ADD SUB MUL DIV
+%token <node> LT LE GT GE EQ NEQ 
+%token <node> ASIGN
+%token <node> SEMICO COMM
+%token <node> LBRACE RBRACE LBRACK RBRACK LPAREN RPAREN
 %token <node> ID
-%token <node> INTEGER
-%token <node> VOID
-%token <node> SEMICO
-%token <node> LBRACE
-%token <node> RBRACE
-%token <node> LPAREN
-%token <node> RPAREN
+%token <node> INTEGER FLOATPOINT
+%token <node> TEST
 %type <node> program
 
 %start program
