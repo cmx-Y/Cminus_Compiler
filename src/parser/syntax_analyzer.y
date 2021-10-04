@@ -52,6 +52,11 @@ syntax_tree_node *node(const char *node_name, int children_num, ...);
 %token <node> INTEGER FLOATPOINT
 %token <node> TEST
 %type <node> program
+%type <node> declaration-list declaration var-declaration type-specifier fun-declaration
+%type <node> params param-list param compound-stmt local-declarations statement-list
+%type <node> statement expression-stmt selection-stmt iteration-stmt return-stmt 
+%type <node> expression var simple-expression relop additive-expression addop
+%type <node> term mulop factor integer float call args arg-list empty
 
 %start program
 
@@ -63,8 +68,75 @@ program: declaration-list {$$ = node( "program", 1, $1); gt->root = $$;}
        ;
 */
 
-program : ;
-
+program: declaration-list {$$ = node( "program", 1, $1); gt->root = $$;};
+declaration-list: declaration-list declaration {$$ = node( "declaration-list", 2, $1, $2);}
+                | declaration {$$ = node( "declaration-list", 1, $1);}
+declaration: var-declaration {$$ = node( "declaration", 1, $1);}
+           | fun-declaration {$$ = node( "declaration", 1, $1);}
+var-declaration: type-specifier ID SEMICO {$$ = node( "var-declaration", 3, $1, $2, $3);}
+               | type-specifier ID LBRACK INTEGER RBRACK SEMICO
+                 {$$ = node( "var-declaration", 6, $1, $2, $3, $4, $5, $6);}
+type-specifier: INT {$$ = node( "type-specifier", 1, $1);}
+              | FLOAT {$$ = node( "type-specifier", 1, $1);}
+              | VOID {$$ = node( "type-specifier", 1, $1);}
+fun-declaration: type-specifier ID LPAREN params RPAREN compound-stmt
+                 {$$ = node( "fun-declaration", 6, $1, $2, $3, $4, $5, $6);}
+params: param-list {$$ = node( "params", 1, $1);}
+      | VOID {$$ = node( "params", 1, $1);}
+param-list: param-list COMM param {$$ = node( "param-list", 3, $1, $2, $3);}
+          | param {$$ = node( "param-list", 1, $1);}
+param: type-specifier ID {$$ = node( "param", 2, $1, $2);}
+     | type-specifier ID LBRACK RBRACK {$$ = node( "param", 4, $1, $2, $3, $4);}
+compound-stmt: LBRACE local-declarations statement-list RBRACE {$$ = node( "compound-stmt", 4, $1, $2, $3, $4);}
+local-declarations: local-declarations var-declaration {$$ = node( "local-declarations", 2, $1, $2);}
+                  | empty {$$ = node("local-declarations", 0);}
+statement-list: statement-list statement {$$ = node( "statement-list", 2, $1, $2);}
+              | empty {$$ = node("statement-list", 0);}
+statement: expression-stmt {$$ = node( "statement", 1, $1);}
+         | compound-stmt {$$ = node( "statement", 1, $1);}
+         | selection-stmt {$$ = node( "statement", 1, $1);}
+         | iteration-stmt {$$ = node( "statement", 1, $1);}
+         | return-stmt {$$ = node( "statement", 1, $1);}
+expression-stmt: expression SEMICO {$$ = node( "expression-stmt", 2, $1, $2);}
+               | SEMICO {$$ = node( "expression-stmt", 1, $1);}
+selection-stmt: IF LPAREN expression RPAREN statement {$$ = node( "selection-stmt", 5, $1, $2, $3, $4, $5);}
+              | IF LPAREN expression RPAREN statement ELSE statement {$$ = node( "selection-stmt", 7, $1, $2, $3, $4, $5, $6, $7);}
+iteration-stmt: WHILE LPAREN expression RPAREN statement {$$ = node( "iteration-stmt", 5, $1, $2, $3, $4, $5);}
+return-stmt: RETURN SEMICO {$$ = node( "return-stmt", 2, $1, $2);}
+           | RETURN expression SEMICO {$$ = node( "return-stmt", 3, $1, $2, $3);}
+expression: var ASIGN expression {$$ = node( "expression", 3, $1, $2, $3);}
+          | simple-expression {$$ = node( "expression", 1, $1);}
+var: ID {$$ = node( "var", 1, $1);}
+   | ID LBRACK expression RBRACK {$$ = node( "var", 4, $1, $2, $3, $4);}
+simple-expression: additive-expression relop additive-expression {$$ = node( "simple-expression", 3, $1, $2, $3);}
+                 | additive-expression {$$ = node( "simple-expression", 1, $1);}
+relop: LE {$$ = node( "relop", 1, $1);}
+     | LT {$$ = node( "relop", 1, $1);}
+     | GT {$$ = node( "relop", 1, $1);}
+     | GE {$$ = node( "relop", 1, $1);}
+     | EQ {$$ = node( "relop", 1, $1);}
+     | NEQ {$$ = node( "relop", 1, $1);}
+additive-expression: additive-expression addop term {$$ = node( "additive-expression", 3, $1, $2, $3);}
+                   | term {$$ = node( "additive-expression", 1, $1);}
+addop: ADD {$$ = node( "addop", 1, $1);}
+     | SUB {$$ = node( "addop", 1, $1);}
+term: term mulop factor {$$ = node( "term", 3, $1, $2, $3);}
+    | factor {$$ = node( "term", 1, $1);}
+mulop: MUL {$$ = node( "mulop", 1, $1);}
+     | DIV {$$ = node( "mulop", 1, $1);}
+factor: LPAREN expression RPAREN {$$ = node( "factor", 3, $1, $2, $3);}
+      | var {$$ = node( "factor", 1, $1);}
+      | call {$$ = node( "factor", 1, $1);}
+      | integer {$$ = node( "factor", 1, $1);}
+      | float {$$ = node( "factor", 1, $1);}
+integer: INTEGER {$$ = node( "integer", 1, $1);}
+float: FLOATPOINT {$$ = node( "float", 1, $1);}
+call: ID LPAREN args RPAREN {$$ = node( "call", 4, $1, $2, $3, $4);}
+args: arg-list {$$ = node( "args", 1, $1);}
+    | empty {$$ = node("args", 0);}
+arg-list: arg-list COMM expression {$$ = node( "arg-list", 3, $1, $2, $3);}
+        | expression {$$ = node( "arg-list", 1, $1);}
+empty:{}
 %%
 
 /// The error reporting function.
