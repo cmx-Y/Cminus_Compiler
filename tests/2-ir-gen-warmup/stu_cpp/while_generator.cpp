@@ -36,6 +36,7 @@ int main() {
   	auto retAlloca = builder->create_alloca(Int32Type);
   	builder->create_store(CONST_INT(0), retAlloca);             
 
+	//create a, i and assign 
 	auto aAlloca = builder->create_alloca(Int32Type);
 	auto iAlloca = builder->create_alloca(Int32Type);
 	builder->create_store(CONST_INT(10), aAlloca);
@@ -52,12 +53,14 @@ int main() {
   	auto br = builder->create_cond_br(icmp, trueBB, falseBB);
   	
   	//if true
+  	//i = i + 1
 	builder->set_insert_point(trueBB);  
 	iLoad = builder->create_load(iAlloca);
 	auto iadd = builder->create_iadd(iLoad, CONST_INT(1));
 	builder->create_store(iadd, iAlloca);
 	iLoad = builder->create_load(iAlloca);
 	
+	//a = a + i
 	aLoad = builder->create_load(aAlloca);
 	auto aadd = builder->create_iadd(aLoad, iLoad);
 	builder->create_store(aadd, aAlloca);
@@ -65,7 +68,7 @@ int main() {
 	icmp = builder->create_icmp_lt(iLoad, CONST_INT(10));
   	br = builder->create_cond_br(icmp, trueBB, falseBB);
 
-	//if false
+	//if false,return a
   	builder->set_insert_point(falseBB);
   	auto retLoad = builder->create_load(aAlloca); 
   	builder->create_ret(retLoad);
