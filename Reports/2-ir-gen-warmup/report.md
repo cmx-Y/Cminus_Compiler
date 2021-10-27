@@ -88,7 +88,7 @@
 请给出 `IR.md` 中提到的两种 getelementptr 用法的区别,并稍加解释:
 
   - `%2 = getelementptr [10 x i32], [10 x i32]* %1, i32 0, i32 %0`
-  - `%2 = getelementptr i32, i32* %1 i32 %0`
+  - `%2 = getelementptr i32, i32* %1, i32 %0`
 
 **GEP instruction:**
 
