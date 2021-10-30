@@ -122,6 +122,7 @@ private:
 
     IRBuilder *builder;
     Scope scope;
+    Value *val;
     std::unique_ptr<Module> module;
 };
 #endif
