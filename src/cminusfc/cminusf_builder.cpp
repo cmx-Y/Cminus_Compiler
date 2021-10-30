@@ -1,5 +1,7 @@
 #include "cminusf_builder.hpp"
 
+using namespace std;
+
 // use these macros to get constant value
 #define CONST_FP(num) \
     ConstantFP::get((float)num, module.get())
@@ -64,7 +66,8 @@ void CminusfBuilder::visit(ASTVarDeclaration &node) {
 }
 
 void CminusfBuilder::visit(ASTFunDeclaration &node) { 
-    Type *retTy;                                                        //return type
+    Type *retTy, *paramTy;                                              //return type
+    vector<Type*>  paramTypes;                                                   
     if(node.type == TYPE_INT)
         retTy = Type::get_int32_type(module.get());
     else if(node.type == TYPE_FLOAT)
@@ -72,8 +75,31 @@ void CminusfBuilder::visit(ASTFunDeclaration &node) {
     else
         retTy = Type::get_void_type(module.get());
     
-    //为了定义函数类型，需要先得到参数类型列表
-    for()
+    //get parameter type list to define function type
+    for(auto cur_param : node.params){
+        if(!cur_param->isarray){
+            if (cur_param->type == TYPE_INT)
+                paramTy = Type::get_int32_type(module.get());
+            else if(cur_param->type == TYPE_FLOAT)
+                paramTy = Type::get_float_type(module.get());
+        }
+        else{
+            if (cur_param->type == TYPE_INT)
+                paramTy = Type::get_int32_ptr_type(module.get());
+            else if(cur_param->type == TYPE_FLOAT)
+                paramTy = Type::get_float_ptr_type(module.get());
+        }
+        paramTypes.push_back(paramTy);                                  //add paramTy to paramTypes
+    }
+
+    //use paramTypes and retTy to define FunctionType
+    auto FunTy = FunctionType::get(retTy, paramTypes);
+
+    //define Function according FunctionType
+    auto Fun = Function::create(FunTy, node.id, module.get());
+
+    scope.push(node.id, Fun);
+    
 }
 
 void CminusfBuilder::visit(ASTParam &node) { }
