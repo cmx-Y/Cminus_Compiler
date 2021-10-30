@@ -18,7 +18,9 @@
  * scope.find: find and return the value bound to the name
  */
 
-void CminusfBuilder::visit(ASTProgram &node) { }
+void CminusfBuilder::visit(ASTProgram &node) {
+	node.declarations->accept(*this);
+ }
 
 void CminusfBuilder::visit(ASTNum &node) { }
 
