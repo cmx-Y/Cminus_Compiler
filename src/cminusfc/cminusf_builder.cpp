@@ -1,6 +1,5 @@
 #include "cminusf_builder.hpp"
 
-using namespace std;
 
 // use these macros to get constant value
 #define CONST_FP(num) \
@@ -11,7 +10,7 @@ using namespace std;
 
 // You can define global variables here
 // to store state
-
+Value *cur_arg;
 /*
  * use CMinusfBuilder::Scope to construct scopes
  * scope.enter: enter a new scope
@@ -55,7 +54,7 @@ void CminusfBuilder::visit(ASTVarDeclaration &node) {
         varTy = ArrayType::get(vartype, node.num->i_val);               //array type IR
     
     Value *var; 
-    if(builder->get_insert_block()){                                    //local variable
+    if(!scope.in_global()){                                             //local variable
         var = builder->create_alloca(varTy);
     }
     else{                                                               //global variable
@@ -67,7 +66,7 @@ void CminusfBuilder::visit(ASTVarDeclaration &node) {
 
 void CminusfBuilder::visit(ASTFunDeclaration &node) { 
     Type *retTy, *paramTy;                                              //return type
-    vector<Type*>  paramTypes;                                                   
+    std::vector<Type*>  paramTypes;                                                   
     if(node.type == TYPE_INT)
         retTy = Type::get_int32_type(module.get());
     else if(node.type == TYPE_FLOAT)
@@ -99,12 +98,48 @@ void CminusfBuilder::visit(ASTFunDeclaration &node) {
     auto Fun = Function::create(FunTy, node.id, module.get());
 
     scope.push(node.id, Fun);
-    
+    //enter a new scope for Fun
+    scope.enter();
+
+    auto bb = BasicBlock::create(module.get(), "entry", Fun);
+    builder->set_insert_point(bb);
+    std::vector<Value *> args;                                          // 获取gcd函数的形参,通过Function中的iterator
+    for (auto arg = Fun->arg_begin(); arg != Fun->arg_end(); arg++) {
+        args.push_back(*arg);                                           // * 号运算符是从迭代器中取出迭代器当前指向的元素
+    }
+    auto i = 0;
+    for(auto cur_param : node.params){
+        cur_arg = args[i++];
+        cur_param->accept(*this);
+    }
+
+    node.compound_stmt->accept(*this);
+    scope.exit();   
 }
 
-void CminusfBuilder::visit(ASTParam &node) { }
+void CminusfBuilder::visit(ASTParam &node) { 
+    Type *paramTy;
+    if(!node.isarray){
+        if(node.type == TYPE_INT)
+            paramTy = Type::get_int32_type(module.get());
+        else if(node.type == TYPE_FLOAT)
+            paramTy = Type::get_float_type(module.get());
+    }
+    else{
+        if(node.type == TYPE_INT)
+            paramTy = Type::get_int32_ptr_type(module.get());
+        else if(node.type == TYPE_FLOAT)
+            paramTy = Type::get_float_ptr_type(module.get());
+    }
 
-void CminusfBuilder::visit(ASTCompoundStmt &node) { }
+    auto paramAlloca = builder->create_alloca(paramTy);
+    builder->create_store(cur_arg, paramAlloca);
+    scope.push(node.id, paramAlloca);
+}
+
+void CminusfBuilder::visit(ASTCompoundStmt &node) { 
+    
+}
 
 void CminusfBuilder::visit(ASTExpressionStmt &node) { }
 
