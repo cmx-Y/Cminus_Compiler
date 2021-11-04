@@ -450,6 +450,7 @@ void ASTPrinter::visit(ASTVarDeclaration &node) {
 void ASTPrinter::visit(ASTFunDeclaration &node) {
     _DEBUG_PRINT_N_(depth);
     std::cout << "fun-declaration: " << node.id << std::endl;
+    //std::cout << "funtype:" << node.type <<std::endl;
     add_depth();
     for (auto param: node.params) {
         param->accept(*this);

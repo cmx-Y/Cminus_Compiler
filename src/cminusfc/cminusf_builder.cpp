@@ -22,7 +22,7 @@ Value *cur_arg;
 void CminusfBuilder::visit(ASTProgram &node) { 
     if(node.declarations.size() == 0)                                   //no declarations
         exit;
-    for (auto cur_declaration : node.declarations)                      //travel node.declarations
+    for (auto& cur_declaration : node.declarations)                      //travel node.declarations
     {
         cur_declaration->accept(*this);
     }
@@ -48,9 +48,9 @@ void CminusfBuilder::visit(ASTVarDeclaration &node) {
         vartype = Type::get_int32_type(module.get());
     else if(node.type == TYPE_FLOAT)
         vartype = Type::get_float_type(module.get());
-    if(node.num == nullptr)                                             //var-declaration →type-specifier ID ;
+    if(node.num == nullptr)                                             
         varTy = vartype;                                        
-    else                                                                //type-specifier ID [ INTEGER ] ;
+    else                                                                
         varTy = ArrayType::get(vartype, node.num->i_val);               //array type IR
     
     Value *var; 
@@ -61,12 +61,12 @@ void CminusfBuilder::visit(ASTVarDeclaration &node) {
         var = GlobalVariable::create(node.id, module.get(), varTy, false, CONST_ZERO(varTy));
     }    
     
-    scope.push(node.id, var);
 }
 
 void CminusfBuilder::visit(ASTFunDeclaration &node) { 
     Type *retTy, *paramTy;                                              //return type
-    std::vector<Type*>  paramTypes;                                                   
+    std::vector<Type*>  paramTypes;
+
     if(node.type == TYPE_INT)
         retTy = Type::get_int32_type(module.get());
     else if(node.type == TYPE_FLOAT)
@@ -103,7 +103,7 @@ void CminusfBuilder::visit(ASTFunDeclaration &node) {
 
     auto bb = BasicBlock::create(module.get(), "entry", Fun);
     builder->set_insert_point(bb);
-    std::vector<Value *> args;                                          // 获取gcd函数的形参,通过Function中的iterator
+    std::vector<Value *> args;                                          // 获取gcd函数的形叄1�7,通过Function中的iterator
     for (auto arg = Fun->arg_begin(); arg != Fun->arg_end(); arg++) {
         args.push_back(*arg);                                           // * 号运算符是从迭代器中取出迭代器当前指向的元素
     }
@@ -137,9 +137,14 @@ void CminusfBuilder::visit(ASTParam &node) {
     scope.push(node.id, paramAlloca);
 }
 
-void CminusfBuilder::visit(ASTCompoundStmt &node) { 
-    
-}
+void CminusfBuilder::visit(ASTCompoundStmt &node) {
+    for(auto cur_local_declaration : node.local_declarations){
+        cur_local_declaration->accept(*this);
+    }
+    for(auto cur_statement : node.statement_list){
+        cur_statement->accept(*this);
+    }
+ }
 
 void CminusfBuilder::visit(ASTExpressionStmt &node) { }
 
@@ -147,7 +152,10 @@ void CminusfBuilder::visit(ASTSelectionStmt &node) { }
 
 void CminusfBuilder::visit(ASTIterationStmt &node) { }
 
-void CminusfBuilder::visit(ASTReturnStmt &node) { }
+void CminusfBuilder::visit(ASTReturnStmt &node) {
+    if(node.expression == nullptr)
+        builder->create_void_ret();    
+ }
 
 void CminusfBuilder::visit(ASTVar &node) { }
 
