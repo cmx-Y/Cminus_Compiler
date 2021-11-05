@@ -8,7 +8,7 @@
 #include "Type.h"
 #include "ast.hpp"
 #include <map>
-
+extern std::vector<Function> AllFun;
 
 
 class Scope {
@@ -66,6 +66,7 @@ public:
                     input_type,
                     "input",
                     module.get());
+        AllFun.push_back(*input_fun);
 
         std::vector<Type *> output_params;
         output_params.push_back(TyInt32);

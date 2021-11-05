@@ -11,6 +11,7 @@
 // You can define global variables here
 // to store state
 Value *cur_arg;
+std::vector<Function> AllFun;   //vector of all function, used for call
 /*
  * use CMinusfBuilder::Scope to construct scopes
  * scope.enter: enter a new scope
@@ -96,6 +97,7 @@ void CminusfBuilder::visit(ASTFunDeclaration &node) {
 
     //define Function according FunctionType
     auto Fun = Function::create(FunTy, node.id, module.get());
+    AllFun.push_back(*Fun);                                             //push function to AllFun
 
     scope.push(node.id, Fun);
     //enter a new scope for Fun
@@ -146,7 +148,9 @@ void CminusfBuilder::visit(ASTCompoundStmt &node) {
     }
  }
 
-void CminusfBuilder::visit(ASTExpressionStmt &node) { }
+void CminusfBuilder::visit(ASTExpressionStmt &node) {
+    node.expression->accept(*this);
+ }
 
 void CminusfBuilder::visit(ASTSelectionStmt &node) { }
 
@@ -161,10 +165,44 @@ void CminusfBuilder::visit(ASTVar &node) { }
 
 void CminusfBuilder::visit(ASTAssignExpression &node) { }
 
-void CminusfBuilder::visit(ASTSimpleExpression &node) { }
+void CminusfBuilder::visit(ASTSimpleExpression &node) {
+    if(node.additive_expression_l != nullptr)
+        node.additive_expression_l->accept(*this);
+    if(node.additive_expression_r != nullptr)
+        node.additive_expression_r->accept(*this);
+    //val = l_val + r_val
+ }
 
-void CminusfBuilder::visit(ASTAdditiveExpression &node) { }
+void CminusfBuilder::visit(ASTAdditiveExpression &node) {
+    if(node.additive_expression != nullptr)
+        node.additive_expression->accept(*this);
+    if(node.term != nullptr)
+        node.term->accept(*this);
+ }
 
-void CminusfBuilder::visit(ASTTerm &node) { }
+void CminusfBuilder::visit(ASTTerm &node) {
+    if(node.term != nullptr)
+        node.term->accept(*this);
+    if(node.factor != nullptr)
+        node.factor->accept(*this);
+ }
 
-void CminusfBuilder::visit(ASTCall &node) { }
+void CminusfBuilder::visit(ASTCall &node) {
+    Function FunTy(AllFun[0].get_function_type(),AllFun[0].get_name(),module.get());    //default create
+    std::vector<Value *> args;
+    std::cout << "vector_size:" << AllFun.size() <<std::endl;                           //for debugging
+    std::cout << "AllFun[1].name:" << AllFun[1].get_name() << std::endl;
+    std::cout << "node.id:" << node.id << std::endl;
+    for(auto cur_Fun = AllFun.begin(); cur_Fun != AllFun.end(); cur_Fun++){             //find the function to be called
+        if((*cur_Fun).get_name() == node.id){
+            std::cout << "??" << (*cur_Fun).get_name() << std::endl;
+            FunTy = *cur_Fun;
+            break;
+        }
+    }
+    std::cout << "FunTy.name:" << FunTy.get_name() << std::endl;
+    /*for (auto arg = FunTy.arg_begin(); arg != FunTy.arg_end(); arg++) {
+        args.push_back(*arg);   
+    }*/
+    auto call = builder->create_call(&FunTy, { });                                      //what's the reason for segmentation default
+ }
