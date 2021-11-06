@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
     CminusfBuilder builder;
     ASTPrinter printer;
     printer.visit(*a.get_root());
-    a.run_visitor(builder);
+    a.run_visitor(builder);    
 
     auto m = builder.getModule();
 

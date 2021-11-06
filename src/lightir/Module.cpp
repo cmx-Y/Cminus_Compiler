@@ -101,6 +101,12 @@ void Module::add_function(Function *f)
 {
     function_list_.push_back(f);
 }
+
+void Module::pop_function()
+{
+    function_list_.pop_back();
+}
+
 std::list<Function* > Module::get_functions(){
     return function_list_;
 }

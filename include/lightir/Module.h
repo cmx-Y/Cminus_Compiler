@@ -30,6 +30,7 @@ public:
     ArrayType *get_array_type(Type *contained, unsigned num_elements);
 
     void add_function(Function *f);
+    void pop_function();
     std::list<Function* > get_functions();
     void add_global_variable(GlobalVariable* g);
     std::list<GlobalVariable *> get_global_variable();

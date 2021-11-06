@@ -188,21 +188,18 @@ void CminusfBuilder::visit(ASTTerm &node) {
  }
 
 void CminusfBuilder::visit(ASTCall &node) {
-    Function FunTy(AllFun[0].get_function_type(),AllFun[0].get_name(),module.get());    //default create
+    auto FunTy = Function::create(AllFun[0].get_function_type(),AllFun[0].get_name(),module.get());
+    //Function FunTy(AllFun[0].get_function_type(),AllFun[0].get_name(),module.get());    //default create
     std::vector<Value *> args;
-    std::cout << "vector_size:" << AllFun.size() <<std::endl;                           //for debugging
-    std::cout << "AllFun[1].name:" << AllFun[1].get_name() << std::endl;
-    std::cout << "node.id:" << node.id << std::endl;
     for(auto cur_Fun = AllFun.begin(); cur_Fun != AllFun.end(); cur_Fun++){             //find the function to be called
         if((*cur_Fun).get_name() == node.id){
-            std::cout << "??" << (*cur_Fun).get_name() << std::endl;
-            FunTy = *cur_Fun;
+            *FunTy = *cur_Fun;
             break;
         }
     }
-    std::cout << "FunTy.name:" << FunTy.get_name() << std::endl;
-    /*for (auto arg = FunTy.arg_begin(); arg != FunTy.arg_end(); arg++) {
+    for (auto arg = FunTy->arg_begin(); arg != FunTy->arg_end(); arg++) {
         args.push_back(*arg);   
-    }*/
-    auto call = builder->create_call(&FunTy, { });                                      //what's the reason for segmentation default
+    }
+    auto call = builder->create_call(FunTy, args);                                      //what's the reason for segmentation default
+    module->pop_function();
  }
