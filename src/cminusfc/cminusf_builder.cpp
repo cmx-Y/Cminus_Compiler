@@ -31,11 +31,12 @@ void CminusfBuilder::visit(ASTProgram &node) {
     }
 }
 
-void CminusfBuilder::visit(ASTNum &node) { 
+void CminusfBuilder::visit(ASTNum &node) {
+    type = node.type;                                                   //type is enum type 
     switch (node.type)                                                  //get num value by type
     {
     case TYPE_INT:                                                      
-        val = ConstantInt::get(node.i_val, module.get());               //CONST_INT(node.i_val)
+        val = CONST_INT(node.i_val);                                    
         break;
     case TYPE_FLOAT:
         val = CONST_FP(node.f_val);
@@ -167,29 +168,104 @@ void CminusfBuilder::visit(ASTVar &node) { }
 
 void CminusfBuilder::visit(ASTAssignExpression &node) { }
 
-void CminusfBuilder::visit(ASTSimpleExpression &node) {
-    if(node.additive_expression_l != nullptr)
+void CminusfBuilder::visit(ASTSimpleExpression &node) {     //code similar to belows
+    if(node.additive_expression_l != nullptr)               //attention that additive_expression_r may be nullptr!
         node.additive_expression_l->accept(*this);
     if(node.additive_expression_r != nullptr)
         node.additive_expression_r->accept(*this);
-    //val = l_val + r_val
  }
 
 void CminusfBuilder::visit(ASTAdditiveExpression &node) {
-    if(node.additive_expression != nullptr)
+    CminusType l_type, r_type;
+    Value *l_val, *r_val;
+    
+    //get value and type
+    if(node.additive_expression != nullptr){
         node.additive_expression->accept(*this);
-    if(node.term != nullptr)
-        node.term->accept(*this);
+        l_val = val;
+        l_type = type;
+    }
+    node.term->accept(*this);
+    r_val = val;
+    r_type = type;
+
+    //calculate to get new type and val
+    if(node.additive_expression == nullptr){
+        type = r_type;
+        val = r_val;
+    }
+    else{
+        if(l_type == r_type && l_type == TYPE_INT)
+            type = TYPE_INT;
+        else type = TYPE_FLOAT;
+        if(type == TYPE_INT){
+            switch (node.op) {
+            case OP_PLUS:
+                val = builder->create_iadd(l_val, r_val);
+                break;
+            case OP_MINUS:
+                val = builder->create_isub(l_val, r_val);
+                break;
+            }
+        }
+        else{
+            switch (node.op) {
+            case OP_PLUS:
+                val = builder->create_fadd(l_val, r_val);
+                break;
+            case OP_MINUS:
+                val = builder->create_fsub(l_val, r_val);
+                break;
+            }
+        }
+    }
  }
 
 void CminusfBuilder::visit(ASTTerm &node) {
-    if(node.term != nullptr)
+    CminusType l_type, r_type;
+    Value *l_val, *r_val;
+    if(node.term != nullptr){
         node.term->accept(*this);
-    if(node.factor != nullptr)
-        node.factor->accept(*this);
+        l_val = val;
+        l_type = type;
+    }
+    node.factor->accept(*this);
+    r_val = val;
+    r_type = type;
+    if(node.term == nullptr){
+        type = r_type;
+        val = r_val;
+    }
+    else{
+        if(l_type == r_type && l_type == TYPE_INT)
+            type = TYPE_INT;
+        else type = TYPE_FLOAT;
+        if(type == TYPE_INT){
+            switch (node.op) {
+            case OP_MUL:
+                val = builder->create_imul(l_val, r_val);
+                break;
+            case OP_DIV:
+                val = builder->create_isdiv(l_val, r_val);
+                break;
+            }
+        }
+        else{
+            switch (node.op) {
+            case OP_MUL:
+                val = builder->create_fmul(l_val, r_val);
+                break;
+            case OP_DIV:
+                val = builder->create_fdiv(l_val, r_val);
+                break;
+            }
+        }
+    }
  }
 
 void CminusfBuilder::visit(ASTCall &node) {
+    auto TyInt32 = Type::get_int32_type(module.get());
+    auto TyFloat = Type::get_float_type(module.get());
     auto FunTy = Function::create(AllFun[0].get_function_type(),AllFun[0].get_name(),module.get());
     //Function FunTy(AllFun[0].get_function_type(),AllFun[0].get_name(),module.get());    //default create
     std::vector<Value *> args;
@@ -201,11 +277,12 @@ void CminusfBuilder::visit(ASTCall &node) {
     }
     for (auto iter = node.args.begin(); iter != node.args.end(); iter++) {
         (*iter)->accept(*this);         //(*) is needed!!!
-        args.push_back(val);   
+        if(FunTy->get_name() == "output" && type == TYPE_FLOAT){        //attention that output()'s param type is int!!
+            auto fptosi = FpToSiInst::create_fptosi(val, TyInt32, builder->get_insert_block());
+            args.push_back(fptosi);
+        }
+        else args.push_back(val);   
     }
-    /*for (auto arg = FunTy->arg_begin(); arg != FunTy->arg_end(); arg++) {
-        args.push_back(*arg);   
-    }*/
     auto call = builder->create_call(FunTy, args);                                      //what's the reason for segmentation default
     module->pop_function();
  }

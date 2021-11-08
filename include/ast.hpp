@@ -186,7 +186,7 @@ struct ASTVar: ASTFactor {
 
 struct ASTAdditiveExpression: ASTNode {
     virtual void accept(ASTVisitor &) override final;
-    std::shared_ptr<ASTAdditiveExpression> additive_expression;
+    std::shared_ptr<ASTAdditiveExpression> additive_expression;     //may be nullptr
     AddOp op;
     std::shared_ptr<ASTTerm> term;
 };

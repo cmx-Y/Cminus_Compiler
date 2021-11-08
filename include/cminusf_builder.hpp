@@ -127,6 +127,7 @@ private:
     IRBuilder *builder;
     Scope scope;
     Value *val;
+    CminusType type;
     std::unique_ptr<Module> module;
 };
 #endif
