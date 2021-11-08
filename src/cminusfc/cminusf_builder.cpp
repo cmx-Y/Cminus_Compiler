@@ -108,7 +108,7 @@ void CminusfBuilder::visit(ASTFunDeclaration &node) {
 
     auto bb = BasicBlock::create(module.get(), "entry", Fun);
     builder->set_insert_point(bb);
-    std::vector<Value *> args;                                          // 获取gcd函数的形叄1�7,通过Function中的iterator
+    std::vector<Value *> args;                                          // 获取gcd函数的形叄1�7,通过Function中的iterator
     for (auto arg = Fun->arg_begin(); arg != Fun->arg_end(); arg++) {
         args.push_back(*arg);                                           // * 号运算符是从迭代器中取出迭代器当前指向的元素
     }
@@ -164,21 +164,101 @@ void CminusfBuilder::visit(ASTReturnStmt &node) {
         builder->create_void_ret();    
  }
 
-void CminusfBuilder::visit(ASTVar &node) { }
+void CminusfBuilder::visit(ASTVar &node) { 
+    
+}
 
-void CminusfBuilder::visit(ASTAssignExpression &node) { }
+void CminusfBuilder::visit(ASTAssignExpression &node) { 
+    auto TyInt32 = Type::get_int32_type(module.get());
+    auto TyFloat = Type::get_float_type(module.get());
+    node.expression->accept(*this);                         
+    auto expr_val = val;
+    auto expr_type = type;
+    node.var->accept(*this);
+    auto var_val = val;
+    auto var_type = type;
+    if(var_type != expr_type){                              
+        if(var_type == TYPE_INT)
+            expr_val = FpToSiInst::create_fptosi(expr_val, TyInt32, builder->get_insert_block());
+        else if(var_type == TYPE_FLOAT)
+            expr_val = SiToFpInst::create_sitofp(expr_val, TyInt32, builder->get_insert_block());
+    }
+    builder->create_store(expr_val, var_val);
+}
 
 void CminusfBuilder::visit(ASTSimpleExpression &node) {     //code similar to belows
-    if(node.additive_expression_l != nullptr)               //attention that additive_expression_r may be nullptr!
+    auto TyInt32 = Type::get_int32_type(module.get());
+    auto TyFloat = Type::get_float_type(module.get());
+    if(node.additive_expression_r == nullptr)               //attention that additive_expression_r may be nullptr!
         node.additive_expression_l->accept(*this);
-    if(node.additive_expression_r != nullptr)
+    else{
+        node.additive_expression_l->accept(*this);
+        auto val_l = val;
         node.additive_expression_r->accept(*this);
+        auto val_r = val;
+        auto is_int = false;
+        if(val_l->get_type()->is_integer_type() && val_r->get_type()->is_integer_type() )
+            is_int = true;
+        Value* cmp;
+        if(is_int){
+            switch (node.op){
+                case OP_LE:
+                    cmp = builder->create_icmp_le(val_l, val_r);
+                    break;
+                case OP_LT:
+                    cmp = builder->create_icmp_lt(val_l, val_r);
+                    break;
+                case OP_EQ:
+                    cmp = builder->create_icmp_eq(val_l, val_r);
+                    break;
+                case OP_NEQ:
+                    cmp = builder->create_icmp_ne(val_l, val_r);
+                    break;
+                case OP_GE:
+                    cmp = builder->create_icmp_ge(val_l, val_r);
+                    break;
+                case OP_GT:
+                    cmp = builder->create_icmp_gt(val_l, val_r);
+                    break;
+            }
+        }
+        else {
+            if(val_l->get_type()->is_integer_type())
+                    val_l = SiToFpInst::create_sitofp(val_l, TyFloat, builder->get_insert_block());
+            else if(val_r->get_type()->is_integer_type())
+                    val_r = SiToFpInst::create_sitofp(val_r, TyFloat, builder->get_insert_block());
+            switch (node.op){
+                case OP_LE:
+                    cmp = builder->create_fcmp_le(val_l, val_r);
+                    break;
+                case OP_LT:
+                    cmp = builder->create_fcmp_lt(val_l, val_r);
+                    break;
+                case OP_EQ:
+                    cmp = builder->create_fcmp_eq(val_l, val_r);
+                    break;
+                case OP_NEQ:
+                    cmp = builder->create_fcmp_ne(val_l, val_r);
+                    break;
+                case OP_GE:
+                    cmp = builder->create_fcmp_ge(val_l, val_r);
+                    break;
+                case OP_GT:
+                    cmp = builder->create_fcmp_gt(val_l, val_r);
+                    break;
+            }
+        }
+        type = TYPE_INT;
+        val = builder->create_zext(cmp, Type::get_int32_type(module.get()));
+    }
  }
 
 void CminusfBuilder::visit(ASTAdditiveExpression &node) {
     CminusType l_type, r_type;
     Value *l_val, *r_val;
-    
+
+    auto TyInt32 = Type::get_int32_type(module.get());
+    auto TyFloat = Type::get_float_type(module.get());
     //get value and type
     if(node.additive_expression != nullptr){
         node.additive_expression->accept(*this);
@@ -209,6 +289,10 @@ void CminusfBuilder::visit(ASTAdditiveExpression &node) {
             }
         }
         else{
+            if(l_type == TYPE_INT)
+                    l_val = SiToFpInst::create_sitofp(l_val, TyFloat, builder->get_insert_block());
+            else if(r_type == TYPE_INT)
+                    r_val = SiToFpInst::create_sitofp(r_val, TyFloat, builder->get_insert_block());
             switch (node.op) {
             case OP_PLUS:
                 val = builder->create_fadd(l_val, r_val);
@@ -224,6 +308,9 @@ void CminusfBuilder::visit(ASTAdditiveExpression &node) {
 void CminusfBuilder::visit(ASTTerm &node) {
     CminusType l_type, r_type;
     Value *l_val, *r_val;
+
+    auto TyInt32 = Type::get_int32_type(module.get());
+    auto TyFloat = Type::get_float_type(module.get());
     if(node.term != nullptr){
         node.term->accept(*this);
         l_val = val;
@@ -251,6 +338,10 @@ void CminusfBuilder::visit(ASTTerm &node) {
             }
         }
         else{
+            if(l_type == TYPE_INT)
+                    l_val = SiToFpInst::create_sitofp(l_val, TyFloat, builder->get_insert_block());
+            else if(r_type == TYPE_INT)
+                    r_val = SiToFpInst::create_sitofp(r_val, TyFloat, builder->get_insert_block());
             switch (node.op) {
             case OP_MUL:
                 val = builder->create_fmul(l_val, r_val);
