@@ -197,9 +197,13 @@ void CminusfBuilder::visit(ASTCall &node) {
             break;
         }
     }
-    for (auto arg = FunTy->arg_begin(); arg != FunTy->arg_end(); arg++) {
-        args.push_back(*arg);   
+    for (auto iter = node.args.begin(); iter != node.args.end(); iter++) {
+        (*iter)->accept(*this);         //(*) is needed!!!
+        args.push_back(val);   
     }
+    /*for (auto arg = FunTy->arg_begin(); arg != FunTy->arg_end(); arg++) {
+        args.push_back(*arg);   
+    }*/
     auto call = builder->create_call(FunTy, args);                                      //what's the reason for segmentation default
     module->pop_function();
  }

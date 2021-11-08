@@ -76,6 +76,7 @@ public:
                     output_type,
                     "output",
                     module.get());
+        AllFun.push_back(*output_fun);
 
         std::vector<Type *> output_float_params;
         output_float_params.push_back(TyFloat);
@@ -85,6 +86,7 @@ public:
                     output_float_type,
                     "outputFloat",
                     module.get());
+        AllFun.push_back(*output_float_fun);
 
         auto neg_idx_except_type = FunctionType::get(TyVoid, {});
         auto neg_idx_except_fun =
@@ -92,6 +94,7 @@ public:
                     neg_idx_except_type,
                     "neg_idx_except",
                     module.get());
+        AllFun.push_back(*neg_idx_except_fun);
 
         scope.enter();
         scope.push("input", input_fun);
