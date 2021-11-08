@@ -6,6 +6,8 @@
     ConstantFP::get((float)num, module.get())
 #define CONST_ZERO(type) \
     ConstantZero::get(type, module.get())
+#define CONST_INT(num) \
+    ConstantInt::get(num, module.get())
 
 
 // You can define global variables here
