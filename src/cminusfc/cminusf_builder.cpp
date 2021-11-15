@@ -14,6 +14,7 @@
 // to store state
 Value *cur_arg;
 std::vector<Function> AllFun;   //vector of all function, used for call
+bool isleftvalue;
 /*
  * use CMinusfBuilder::Scope to construct scopes
  * scope.enter: enter a new scope
@@ -63,8 +64,8 @@ void CminusfBuilder::visit(ASTVarDeclaration &node) {
     }
     else{                                                               //global variable
         var = GlobalVariable::create(node.id, module.get(), varTy, false, CONST_ZERO(varTy));
-    }    
-    
+    }   
+    scope.push(node.id, var);
 }
 
 void CminusfBuilder::visit(ASTFunDeclaration &node) { 
@@ -153,6 +154,7 @@ void CminusfBuilder::visit(ASTCompoundStmt &node) {
 
 void CminusfBuilder::visit(ASTExpressionStmt &node) {
     node.expression->accept(*this);
+
  }
 
 void CminusfBuilder::visit(ASTSelectionStmt &node) { }
@@ -161,16 +163,67 @@ void CminusfBuilder::visit(ASTIterationStmt &node) { }
 
 void CminusfBuilder::visit(ASTReturnStmt &node) {
     if(node.expression == nullptr)
-        builder->create_void_ret();    
+        builder->create_void_ret();
+        
  }
 
 void CminusfBuilder::visit(ASTVar &node) { 
-    
+    auto var = scope.find(node.id);
+    auto TyInt32 = Type::get_int32_type(module.get());
+    auto TyFloat = Type::get_float_type(module.get());
+
+    if(node.expression == nullptr){
+        if(isleftvalue){                                    //there's no value in the alloca, should store first
+            val = var;
+            isleftvalue = false;
+            type = val->get_type()->get_pointer_element_type()==TyInt32 ? TYPE_INT : TYPE_FLOAT;
+        }
+        else{
+            val = builder->create_load(var);
+            type = val->get_type()==TyInt32 ? TYPE_INT : TYPE_FLOAT;             
+        }
+    }
+    else{
+        node.expression->accept(*this);
+        auto expr_val = val;
+        auto expr_type = type;
+        auto isnegBB = BasicBlock::create(module.get(), "", builder->get_insert_block()->get_parent());
+        auto notnegBB = BasicBlock::create(module.get(), "", builder->get_insert_block()->get_parent());
+        if(expr_type == TYPE_FLOAT){
+            expr_val = FpToSiInst::create_fptosi(expr_val, TyInt32, builder->get_insert_block()); 
+        }
+        auto isneg = builder->create_icmp_lt(expr_val, CONST_INT(0));
+        
+        auto br = builder->create_cond_br(isneg, isnegBB, notnegBB);
+        builder->set_insert_point(isnegBB);
+        builder->create_call(scope.find("neg_idx_except"), {});
+        builder->create_br(notnegBB);
+        /*if (builder->get_insert_block()->get_parent()->get_return_type()->is_void_type())
+            builder->create_void_ret();
+        else if (builder->get_insert_block()->get_parent()->get_return_type()->is_float_type())
+            builder->create_ret(CONST_FP(0.));
+        else
+            builder->create_ret(CONST_INT(0));*/
+
+        builder->set_insert_point(notnegBB);
+        var = builder->create_gep(var, {CONST_INT(0), expr_val});
+
+        if(isleftvalue){                                    //there's no value in the alloca, should store first
+            val = var;
+            isleftvalue = false;
+            type = val->get_type()->get_pointer_element_type()==TyInt32 ? TYPE_INT : TYPE_FLOAT;
+        }
+        else{
+            val = builder->create_load(var);  
+            type = val->get_type()==TyInt32 ? TYPE_INT : TYPE_FLOAT;           
+        }
+    }
 }
 
 void CminusfBuilder::visit(ASTAssignExpression &node) { 
     auto TyInt32 = Type::get_int32_type(module.get());
     auto TyFloat = Type::get_float_type(module.get());
+    isleftvalue = true;
     node.expression->accept(*this);                         
     auto expr_val = val;
     auto expr_type = type;
@@ -184,7 +237,9 @@ void CminusfBuilder::visit(ASTAssignExpression &node) {
             expr_val = SiToFpInst::create_sitofp(expr_val, TyInt32, builder->get_insert_block());
     }
     builder->create_store(expr_val, var_val);
+    val = expr_val;
 }
+
 
 void CminusfBuilder::visit(ASTSimpleExpression &node) {     //code similar to belows
     auto TyInt32 = Type::get_int32_type(module.get());
