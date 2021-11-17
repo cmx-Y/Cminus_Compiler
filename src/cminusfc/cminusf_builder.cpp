@@ -14,6 +14,7 @@
 // to store state
 Value *cur_arg;
 std::vector<Function> AllFun;   //vector of all function, used for call
+Type *cur_retTy;
 std::map<std::string,bool> isleftvalue;
 /*
  * use CMinusfBuilder::Scope to construct scopes
@@ -99,6 +100,8 @@ void CminusfBuilder::visit(ASTFunDeclaration &node) {
 
     //use paramTypes and retTy to define FunctionType
     auto FunTy = FunctionType::get(retTy, paramTypes);
+    cur_retTy = retTy;
+    //std::cout << cur_retTy << std::endl;
 
     //define Function according FunctionType
     auto Fun = Function::create(FunTy, node.id, module.get());
@@ -122,6 +125,7 @@ void CminusfBuilder::visit(ASTFunDeclaration &node) {
 
     node.compound_stmt->accept(*this);
     scope.exit();   
+    
 }
 
 void CminusfBuilder::visit(ASTParam &node) { 
@@ -143,6 +147,7 @@ void CminusfBuilder::visit(ASTParam &node) {
     builder->create_store(cur_arg, paramAlloca);
     isleftvalue.insert({node.id, false});
     scope.push(node.id, paramAlloca);
+    type = node.type;
 }
 
 void CminusfBuilder::visit(ASTCompoundStmt &node) {
@@ -217,10 +222,16 @@ void CminusfBuilder::visit(ASTIterationStmt &node) {
  }
 
 void CminusfBuilder::visit(ASTReturnStmt &node) {
+    auto TyInt32 = Type::get_int32_type(module.get());
+    auto TyFloat = Type::get_float_type(module.get());
     if(node.expression == nullptr)
         builder->create_void_ret();
     else{
         node.expression->accept(*this);
+        if(cur_retTy->is_float_type() && type == TYPE_INT)
+            val = SiToFpInst::create_sitofp(val, TyFloat, builder->get_insert_block());
+        else if(cur_retTy->is_integer_type() && type == TYPE_FLOAT)
+            val = FpToSiInst::create_fptosi(val, TyInt32, builder->get_insert_block());
         auto ret = builder->create_ret(val);
     }
         
@@ -297,6 +308,7 @@ void CminusfBuilder::visit(ASTAssignExpression &node) {
     }
     builder->create_store(expr_val, var_val);
     val = expr_val;
+    type = var_type;
 }
 
 
@@ -480,21 +492,25 @@ void CminusfBuilder::visit(ASTCall &node) {
             break;
         }
     }
+
     for (auto iter = node.args.begin(); iter != node.args.end(); iter++) {
         (*iter)->accept(*this);         //(*) is needed!!!
         /*if(FunTy->get_name() == "output" && type == TYPE_FLOAT){        //attention that output()'s param type is int!!
             auto fptosi = FpToSiInst::create_fptosi(val, TyInt32, builder->get_insert_block());
             args.push_back(fptosi);
         }*/
-        if(FunTy->get_function_type()->get_param_type(0)->is_integer_type() && type == TYPE_FLOAT){
-            auto fptosi = FpToSiInst::create_fptosi(val, TyInt32, builder->get_insert_block());
-            args.push_back(fptosi);
-        }
-        else if(FunTy->get_function_type()->get_param_type(0)->is_float_type() && type == TYPE_INT){
-            auto sitofp = SiToFpInst::create_sitofp(val, TyFloat, builder->get_insert_block());
-            args.push_back(sitofp);
+        if(FunTy->get_num_of_args() > 0 ){
+            if(FunTy->get_function_type()->get_param_type(0)->is_integer_type() && val->get_type()->is_float_type()){
+                std::cout << type << std::endl;
+                auto fptosi = FpToSiInst::create_fptosi(val, TyInt32, builder->get_insert_block());
+                args.push_back(fptosi);
+            }
+            else if(FunTy->get_function_type()->get_param_type(0)->is_float_type() && val->get_type()->is_integer_type()){
+                auto sitofp = SiToFpInst::create_sitofp(val, TyFloat, builder->get_insert_block());
+                args.push_back(sitofp);
+            } 
+            else args.push_back(val);  
         } 
-        else args.push_back(val);   
     }
     auto call = builder->create_call(FunTy, args);                                      //what's the reason for segmentation default
     val = call;
