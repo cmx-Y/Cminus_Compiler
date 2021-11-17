@@ -146,12 +146,14 @@ void CminusfBuilder::visit(ASTParam &node) {
 }
 
 void CminusfBuilder::visit(ASTCompoundStmt &node) {
+    scope.enter();
     for(auto cur_local_declaration : node.local_declarations){
         cur_local_declaration->accept(*this);
     }
     for(auto cur_statement : node.statement_list){
         cur_statement->accept(*this);
     }
+    scope.exit();
  }
 
 void CminusfBuilder::visit(ASTExpressionStmt &node) {
@@ -480,18 +482,18 @@ void CminusfBuilder::visit(ASTCall &node) {
     }
     for (auto iter = node.args.begin(); iter != node.args.end(); iter++) {
         (*iter)->accept(*this);         //(*) is needed!!!
-        if(FunTy->get_name() == "output" && type == TYPE_FLOAT){        //attention that output()'s param type is int!!
+        /*if(FunTy->get_name() == "output" && type == TYPE_FLOAT){        //attention that output()'s param type is int!!
+            auto fptosi = FpToSiInst::create_fptosi(val, TyInt32, builder->get_insert_block());
+            args.push_back(fptosi);
+        }*/
+        if(FunTy->get_function_type()->get_param_type(0)->is_integer_type() && type == TYPE_FLOAT){
             auto fptosi = FpToSiInst::create_fptosi(val, TyInt32, builder->get_insert_block());
             args.push_back(fptosi);
         }
-        /*if(FunTy->get_function_type()->is_integer_type() && type == TYPE_FLOAT){
-            auto fptosi = FpToSiInst::create_fptosi(val, TyInt32, builder->get_insert_block());
-            args.push_back(fptosi);
-        }
-        else if(FunTy->get_function_type()->is_float_type() && type == TYPE_INT){
+        else if(FunTy->get_function_type()->get_param_type(0)->is_float_type() && type == TYPE_INT){
             auto sitofp = SiToFpInst::create_sitofp(val, TyFloat, builder->get_insert_block());
             args.push_back(sitofp);
-        } */
+        } 
         else args.push_back(val);   
     }
     auto call = builder->create_call(FunTy, args);                                      //what's the reason for segmentation default
