@@ -80,10 +80,10 @@ int main(int argc, char **argv) {
     if (!emit) {
         auto command_string = "clang -O0 -w "s + target_path + ".ll -o " + target_path + " -L. -lcminus_io";
         int re_code0 = std::system(command_string.c_str());
-        /*command_string = "rm "s + target_path + ".ll";
+        command_string = "rm "s + target_path + ".ll";
         int re_code1 = std::system(command_string.c_str());
         if(re_code0==0 && re_code1==0) return 0;
-        else return 1;*/
+        else return 1;
     }
 
     return 0;
