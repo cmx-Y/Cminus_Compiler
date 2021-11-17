@@ -484,6 +484,14 @@ void CminusfBuilder::visit(ASTCall &node) {
             auto fptosi = FpToSiInst::create_fptosi(val, TyInt32, builder->get_insert_block());
             args.push_back(fptosi);
         }
+        /*if(FunTy->get_function_type()->is_integer_type() && type == TYPE_FLOAT){
+            auto fptosi = FpToSiInst::create_fptosi(val, TyInt32, builder->get_insert_block());
+            args.push_back(fptosi);
+        }
+        else if(FunTy->get_function_type()->is_float_type() && type == TYPE_INT){
+            auto sitofp = SiToFpInst::create_sitofp(val, TyFloat, builder->get_insert_block());
+            args.push_back(sitofp);
+        } */
         else args.push_back(val);   
     }
     auto call = builder->create_call(FunTy, args);                                      //what's the reason for segmentation default
