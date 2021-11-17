@@ -77,6 +77,14 @@ public:
                     "output",
                     module.get());
         AllFun.push_back(*output_fun);
+<<<<<<< Updated upstream
+=======
+        auto bb = BasicBlock::create(module.get(), "entry", output_fun);
+        builder->set_insert_point(bb);
+        auto paramAlloca = builder->create_alloca(TyInt32);
+        //builder->create_store(output_fun->get_args(), paramAlloca);
+
+>>>>>>> Stashed changes
 
         std::vector<Type *> output_float_params;
         output_float_params.push_back(TyFloat);
@@ -87,6 +95,10 @@ public:
                     "outputFloat",
                     module.get());
         AllFun.push_back(*output_float_fun);
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 
         auto neg_idx_except_type = FunctionType::get(TyVoid, {});
         auto neg_idx_except_fun =
