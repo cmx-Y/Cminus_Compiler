@@ -110,7 +110,7 @@ void CminusfBuilder::visit(ASTFunDeclaration &node) {
 
     auto bb = BasicBlock::create(module.get(), "entry", Fun);
     builder->set_insert_point(bb);
-    std::vector<Value *> args;                                          // 获取gcd函数的形叄1�71ￄ1�77,通过Function中的iterator
+    std::vector<Value *> args;                                          // 获取gcd函数的形叄1�71ￄ1�77,通过Function中的iterator
     for (auto arg = Fun->arg_begin(); arg != Fun->arg_end(); arg++) {
         args.push_back(*arg);                                           // * 号运算符是从迭代器中取出迭代器当前指向的元素
     }
@@ -291,7 +291,7 @@ void CminusfBuilder::visit(ASTAssignExpression &node) {
         if(var_type == TYPE_INT)
             expr_val = FpToSiInst::create_fptosi(expr_val, TyInt32, builder->get_insert_block());
         else if(var_type == TYPE_FLOAT)
-            expr_val = SiToFpInst::create_sitofp(expr_val, TyInt32, builder->get_insert_block());
+            expr_val = SiToFpInst::create_sitofp(expr_val, TyFloat, builder->get_insert_block());
     }
     builder->create_store(expr_val, var_val);
     val = expr_val;
