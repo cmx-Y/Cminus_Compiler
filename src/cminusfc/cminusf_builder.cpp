@@ -110,7 +110,7 @@ void CminusfBuilder::visit(ASTFunDeclaration &node) {
 
     auto bb = BasicBlock::create(module.get(), "entry", Fun);
     builder->set_insert_point(bb);
-    std::vector<Value *> args;                                          // 获取gcd函数的形叄1�71ￄ1�77,通过Function中的iterator
+    std::vector<Value *> args;                                          // 获取gcd函数的形叄1�71ￄ1�77,通过Function中的iterator
     for (auto arg = Fun->arg_begin(); arg != Fun->arg_end(); arg++) {
         args.push_back(*arg);                                           // * 号运算符是从迭代器中取出迭代器当前指向的元素
     }
@@ -482,10 +482,18 @@ void CminusfBuilder::visit(ASTCall &node) {
     }
     for (auto iter = node.args.begin(); iter != node.args.end(); iter++) {
         (*iter)->accept(*this);         //(*) is needed!!!
-        if(FunTy->get_name() == "output" && type == TYPE_FLOAT){        //attention that output()'s param type is int!!
+        /*if(FunTy->get_name() == "output" && type == TYPE_FLOAT){        //attention that output()'s param type is int!!
+            auto fptosi = FpToSiInst::create_fptosi(val, TyInt32, builder->get_insert_block());
+            args.push_back(fptosi);
+        }*/
+        if(FunTy->get_function_type()->get_param_type(0)->is_integer_type() && type == TYPE_FLOAT){
             auto fptosi = FpToSiInst::create_fptosi(val, TyInt32, builder->get_insert_block());
             args.push_back(fptosi);
         }
+        else if(FunTy->get_function_type()->get_param_type(0)->is_float_type() && type == TYPE_INT){
+            auto sitofp = SiToFpInst::create_sitofp(val, TyFloat, builder->get_insert_block());
+            args.push_back(sitofp);
+        } 
         else args.push_back(val);   
     }
     auto call = builder->create_call(FunTy, args);                                      //what's the reason for segmentation default
