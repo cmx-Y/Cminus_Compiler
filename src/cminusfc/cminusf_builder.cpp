@@ -14,7 +14,7 @@
 // to store state
 Value *cur_arg;
 std::vector<Function> AllFun;   //vector of all function, used for call
-bool isleftvalue;
+std::map<std::string,bool> isleftvalue;
 /*
  * use CMinusfBuilder::Scope to construct scopes
  * scope.enter: enter a new scope
@@ -65,6 +65,7 @@ void CminusfBuilder::visit(ASTVarDeclaration &node) {
     else{                                                               //global variable
         var = GlobalVariable::create(node.id, module.get(), varTy, false, CONST_ZERO(varTy));
     }   
+    isleftvalue.insert({node.id, false});
     scope.push(node.id, var);
 }
 
@@ -109,7 +110,7 @@ void CminusfBuilder::visit(ASTFunDeclaration &node) {
 
     auto bb = BasicBlock::create(module.get(), "entry", Fun);
     builder->set_insert_point(bb);
-    std::vector<Value *> args;                                          // 获取gcd函数的形叄1�7,通过Function中的iterator
+    std::vector<Value *> args;                                          // 获取gcd函数的形叄1�71ￄ1�77,通过Function中的iterator
     for (auto arg = Fun->arg_begin(); arg != Fun->arg_end(); arg++) {
         args.push_back(*arg);                                           // * 号运算符是从迭代器中取出迭代器当前指向的元素
     }
@@ -140,6 +141,7 @@ void CminusfBuilder::visit(ASTParam &node) {
 
     auto paramAlloca = builder->create_alloca(paramTy);
     builder->create_store(cur_arg, paramAlloca);
+    isleftvalue.insert({node.id, false});
     scope.push(node.id, paramAlloca);
 }
 
@@ -157,13 +159,68 @@ void CminusfBuilder::visit(ASTExpressionStmt &node) {
 
  }
 
-void CminusfBuilder::visit(ASTSelectionStmt &node) { }
+void CminusfBuilder::visit(ASTSelectionStmt &node) {
+    auto TyInt32 = Type::get_int32_type(module.get());
+    auto trueBB = BasicBlock::create(module.get(), "", builder->get_insert_block()->get_parent());
+    auto falseBB = BasicBlock::create(module.get(), "", builder->get_insert_block()->get_parent());
+    node.expression->accept(*this);
+    auto expr_val = val;
+    auto expr_type = type;
+    if(expr_type == TYPE_FLOAT){
+            expr_val = FpToSiInst::create_fptosi(expr_val, TyInt32, builder->get_insert_block()); 
+        }
+    auto istrue = builder->create_icmp_ne(expr_val, CONST_INT(0));
+    
+    auto br = builder->create_cond_br(istrue, trueBB, falseBB);
+    builder->set_insert_point(trueBB);
+    node.if_statement->accept(*this);
+    if(node.else_statement == nullptr){
+        builder->create_br(falseBB);
+        builder->set_insert_point(falseBB);    
+    }
+    else{
+        auto outBB = BasicBlock::create(module.get(), "", builder->get_insert_block()->get_parent());
+        builder->create_br(outBB);
+        builder->set_insert_point(falseBB);
+        node.else_statement->accept(*this); 
+        builder->create_br(outBB);
+        builder->set_insert_point(outBB);   
+    }
 
-void CminusfBuilder::visit(ASTIterationStmt &node) { }
+ }
+
+void CminusfBuilder::visit(ASTIterationStmt &node) {
+    auto TyInt32 = Type::get_int32_type(module.get());
+    auto enterBB = BasicBlock::create(module.get(), "", builder->get_insert_block()->get_parent());
+    auto trueBB = BasicBlock::create(module.get(), "", builder->get_insert_block()->get_parent());
+    auto falseBB = BasicBlock::create(module.get(), "", builder->get_insert_block()->get_parent());
+
+    builder->create_br(enterBB);
+    builder->set_insert_point(enterBB);
+    node.expression->accept(*this);
+    auto expr_val = val;
+    auto expr_type = type;
+    if(expr_type == TYPE_FLOAT){
+            expr_val = FpToSiInst::create_fptosi(expr_val, TyInt32, builder->get_insert_block()); 
+        }
+    auto istrue = builder->create_icmp_ne(expr_val, CONST_INT(0));
+    auto br = builder->create_cond_br(istrue, trueBB, falseBB);
+
+    builder->set_insert_point(trueBB);
+    node.statement->accept(*this);
+    builder->create_br(enterBB);
+
+    builder->set_insert_point(falseBB);
+
+ }
 
 void CminusfBuilder::visit(ASTReturnStmt &node) {
     if(node.expression == nullptr)
         builder->create_void_ret();
+    else{
+        node.expression->accept(*this);
+        auto ret = builder->create_ret(val);
+    }
         
  }
 
@@ -173,9 +230,9 @@ void CminusfBuilder::visit(ASTVar &node) {
     auto TyFloat = Type::get_float_type(module.get());
 
     if(node.expression == nullptr){
-        if(isleftvalue){                                    //there's no value in the alloca, should store first
+        if(isleftvalue.find(node.id)->second){                                    //there's no value in the alloca, should store first
             val = var;
-            isleftvalue = false;
+            isleftvalue[node.id] = false;
             type = val->get_type()->get_pointer_element_type()==TyInt32 ? TYPE_INT : TYPE_FLOAT;
         }
         else{
@@ -208,9 +265,9 @@ void CminusfBuilder::visit(ASTVar &node) {
         builder->set_insert_point(notnegBB);
         var = builder->create_gep(var, {CONST_INT(0), expr_val});
 
-        if(isleftvalue){                                    //there's no value in the alloca, should store first
+        if(isleftvalue.find(node.id)->second){                                    //there's no value in the alloca, should store first
             val = var;
-            isleftvalue = false;
+            isleftvalue[node.id] = false;
             type = val->get_type()->get_pointer_element_type()==TyInt32 ? TYPE_INT : TYPE_FLOAT;
         }
         else{
@@ -223,10 +280,10 @@ void CminusfBuilder::visit(ASTVar &node) {
 void CminusfBuilder::visit(ASTAssignExpression &node) { 
     auto TyInt32 = Type::get_int32_type(module.get());
     auto TyFloat = Type::get_float_type(module.get());
-    isleftvalue = true;
     node.expression->accept(*this);                         
     auto expr_val = val;
     auto expr_type = type;
+    isleftvalue[node.var->id] = true;
     node.var->accept(*this);
     auto var_val = val;
     auto var_type = type;
@@ -430,5 +487,6 @@ void CminusfBuilder::visit(ASTCall &node) {
         else args.push_back(val);   
     }
     auto call = builder->create_call(FunTy, args);                                      //what's the reason for segmentation default
+    val = call;
     module->pop_function();
  }
