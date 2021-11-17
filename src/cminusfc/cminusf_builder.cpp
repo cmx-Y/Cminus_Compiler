@@ -146,12 +146,14 @@ void CminusfBuilder::visit(ASTParam &node) {
 }
 
 void CminusfBuilder::visit(ASTCompoundStmt &node) {
+    scope.enter();
     for(auto cur_local_declaration : node.local_declarations){
         cur_local_declaration->accept(*this);
     }
     for(auto cur_statement : node.statement_list){
         cur_statement->accept(*this);
     }
+    scope.exit();
  }
 
 void CminusfBuilder::visit(ASTExpressionStmt &node) {
@@ -291,7 +293,7 @@ void CminusfBuilder::visit(ASTAssignExpression &node) {
         if(var_type == TYPE_INT)
             expr_val = FpToSiInst::create_fptosi(expr_val, TyInt32, builder->get_insert_block());
         else if(var_type == TYPE_FLOAT)
-            expr_val = SiToFpInst::create_sitofp(expr_val, TyInt32, builder->get_insert_block());
+            expr_val = SiToFpInst::create_sitofp(expr_val, TyFloat, builder->get_insert_block());
     }
     builder->create_store(expr_val, var_val);
     val = expr_val;
