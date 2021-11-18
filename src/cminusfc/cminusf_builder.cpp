@@ -15,6 +15,7 @@
 Value *cur_arg;
 std::vector<Function> AllFun;   //vector of all function, used for call
 Type *cur_retTy;
+bool is_retstmt;
 std::map<std::string,bool> isleftvalue;
 /*
  * use CMinusfBuilder::Scope to construct scopes
@@ -187,14 +188,25 @@ void CminusfBuilder::visit(ASTSelectionStmt &node) {
     }
     else{
         auto outBB = BasicBlock::create(module.get(), "", builder->get_insert_block()->get_parent());
-        builder->create_br(outBB);
+        bool is_retstmt1;
+        bool is_retstmt2;
+        if(!is_retstmt){
+            builder->create_br(outBB);
+        }
+        if(is_retstmt)  {is_retstmt = false; is_retstmt1 = true;}
         builder->set_insert_point(falseBB);
         node.else_statement->accept(*this); 
-        builder->create_br(outBB);
-        builder->set_insert_point(outBB);   
+        if(!is_retstmt)
+            builder->create_br(outBB);
+        if(is_retstmt)  {is_retstmt = false; is_retstmt2 = true;}
+        if(!(is_retstmt1 && is_retstmt2))
+            builder->set_insert_point(outBB);  
+        else 
+            outBB->erase_from_parent(); 
     }
 
  }
+
 
 void CminusfBuilder::visit(ASTIterationStmt &node) {
     auto TyInt32 = Type::get_int32_type(module.get());
@@ -234,7 +246,7 @@ void CminusfBuilder::visit(ASTReturnStmt &node) {
             val = FpToSiInst::create_fptosi(val, TyInt32, builder->get_insert_block());
         auto ret = builder->create_ret(val);
     }
-        
+    is_retstmt = true;    
  }
 
 void CminusfBuilder::visit(ASTVar &node) { 
@@ -246,11 +258,14 @@ void CminusfBuilder::visit(ASTVar &node) {
         if(isleftvalue.find(node.id)->second){                                    //there's no value in the alloca, should store first
             val = var;
             isleftvalue[node.id] = false;
-            type = val->get_type()->get_pointer_element_type()==TyInt32 ? TYPE_INT : TYPE_FLOAT;
+            type = (val->get_type()->get_pointer_element_type()==TyInt32) ? TYPE_INT : TYPE_FLOAT;
         }
         else{
-            val = builder->create_load(var);
-            type = val->get_type()==TyInt32 ? TYPE_INT : TYPE_FLOAT;             
+            if(var->get_type()->get_pointer_element_type()->is_array_type())
+                val = builder->create_gep(var, {CONST_INT(0), CONST_INT(0)});
+            else
+                val = builder->create_load(var);
+            type = (val->get_type()==TyInt32) ? TYPE_INT : TYPE_FLOAT;           
         }
     }
     else{
@@ -276,7 +291,12 @@ void CminusfBuilder::visit(ASTVar &node) {
             builder->create_ret(CONST_INT(0));*/
 
         builder->set_insert_point(notnegBB);
-        var = builder->create_gep(var, {CONST_INT(0), expr_val});
+        if(var->get_type()->get_pointer_element_type()->is_pointer_type()){
+            auto load_var = builder->create_load(var);
+            var = builder->create_gep(load_var,{expr_val});
+        }
+        else
+            var = builder->create_gep(var, {CONST_INT(0),expr_val});
 
         if(isleftvalue.find(node.id)->second){                                    //there's no value in the alloca, should store first
             val = var;
@@ -299,12 +319,15 @@ void CminusfBuilder::visit(ASTAssignExpression &node) {
     isleftvalue[node.var->id] = true;
     node.var->accept(*this);
     auto var_val = val;
-    auto var_type = type;
-    if(var_type != expr_type){                              
-        if(var_type == TYPE_INT)
-            expr_val = FpToSiInst::create_fptosi(expr_val, TyInt32, builder->get_insert_block());
-        else if(var_type == TYPE_FLOAT)
-            expr_val = SiToFpInst::create_sitofp(expr_val, TyFloat, builder->get_insert_block());
+    auto var_type = type; 
+    //std::cout << (var_type == TYPE_INT) << std::endl;                            
+    if(val->get_type()->get_pointer_element_type()->is_integer_type() && expr_type == TYPE_FLOAT)
+        expr_val = FpToSiInst::create_fptosi(expr_val, TyInt32, builder->get_insert_block());
+    else if(val->get_type()->get_pointer_element_type()->is_float_type() && expr_type == TYPE_INT)
+        expr_val = SiToFpInst::create_sitofp(expr_val, TyFloat, builder->get_insert_block());
+    if(var_val->get_type()->get_pointer_element_type()->is_pointer_type()){
+        auto load_var = builder->create_load(var_val);
+        var_val = builder->create_gep(load_var,{CONST_INT(0)});
     }
     builder->create_store(expr_val, var_val);
     val = expr_val;
@@ -501,7 +524,7 @@ void CminusfBuilder::visit(ASTCall &node) {
         }*/
         if(FunTy->get_num_of_args() > 0 ){
             if(FunTy->get_function_type()->get_param_type(0)->is_integer_type() && val->get_type()->is_float_type()){
-                std::cout << type << std::endl;
+                //std::cout << type << std::endl;
                 auto fptosi = FpToSiInst::create_fptosi(val, TyInt32, builder->get_insert_block());
                 args.push_back(fptosi);
             }
