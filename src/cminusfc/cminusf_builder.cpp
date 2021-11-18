@@ -14,7 +14,11 @@
 // to store state
 Value *cur_arg;
 std::vector<Function> AllFun;   //vector of all function, used for call
+Type *cur_retTy;
+bool is_retstmt = false;
 std::map<std::string,bool> isleftvalue;
+BasicBlock* whileBB;
+std::vector<bool> finalstmt;
 /*
  * use CMinusfBuilder::Scope to construct scopes
  * scope.enter: enter a new scope
@@ -99,6 +103,8 @@ void CminusfBuilder::visit(ASTFunDeclaration &node) {
 
     //use paramTypes and retTy to define FunctionType
     auto FunTy = FunctionType::get(retTy, paramTypes);
+    cur_retTy = retTy;
+    //std::cout << cur_retTy << std::endl;
 
     //define Function according FunctionType
     auto Fun = Function::create(FunTy, node.id, module.get());
@@ -110,9 +116,9 @@ void CminusfBuilder::visit(ASTFunDeclaration &node) {
 
     auto bb = BasicBlock::create(module.get(), "entry", Fun);
     builder->set_insert_point(bb);
-    std::vector<Value *> args;                                          // è·å–gcdå‡½æ•°çš„å½¢å„1ï¿½71ï¿„1ï¿½77,é€šè¿‡Functionä¸­çš„iterator
+    std::vector<Value *> args;                                          // »ñÈ¡gcdº¯ÊıµÄĞÎ…£1„1¤771„1Ÿ61„1¤777,Í¨¹ıFunctionÖĞµÄiterator
     for (auto arg = Fun->arg_begin(); arg != Fun->arg_end(); arg++) {
-        args.push_back(*arg);                                           // * å·è¿ç®—ç¬¦æ˜¯ä»è¿­ä»£å™¨ä¸­å–å‡ºè¿­ä»£å™¨å½“å‰æŒ‡å‘çš„å…ƒç´ 
+        args.push_back(*arg);                                           // * ºÅÔËËã·ûÊÇ´Óµü´úÆ÷ÖĞÈ¡³öµü´úÆ÷µ±Ç°Ö¸ÏòµÄÔªËØ
     }
     auto i = 0;
     for(auto cur_param : node.params){
@@ -122,6 +128,7 @@ void CminusfBuilder::visit(ASTFunDeclaration &node) {
 
     node.compound_stmt->accept(*this);
     scope.exit();   
+    
 }
 
 void CminusfBuilder::visit(ASTParam &node) { 
@@ -143,9 +150,11 @@ void CminusfBuilder::visit(ASTParam &node) {
     builder->create_store(cur_arg, paramAlloca);
     isleftvalue.insert({node.id, false});
     scope.push(node.id, paramAlloca);
+    type = node.type;
 }
 
 void CminusfBuilder::visit(ASTCompoundStmt &node) {
+    finalstmt.push_back(true);
     scope.enter();
     for(auto cur_local_declaration : node.local_declarations){
         cur_local_declaration->accept(*this);
@@ -153,11 +162,23 @@ void CminusfBuilder::visit(ASTCompoundStmt &node) {
     for(auto cur_statement : node.statement_list){
         cur_statement->accept(*this);
     }
+    if(builder->get_insert_block()->get_parent()->get_name()=="main" && builder->get_insert_block() == whileBB && finalstmt.size()==1){
+        builder->set_insert_point(whileBB);
+        /*whileBB->erase_from_parent();
+        auto frontBB = *(whileBB->get_pre_basic_blocks().end());
+        frontBB->delete_instr(whilebr);
+        builder->set_insert_point(frontBB);*/
+        if(whileBB->empty() == true)
+        whileBB->add_instr_begin(builder->create_void_ret());
+    }
     scope.exit();
+    is_retstmt = false;
+    finalstmt.pop_back();
  }
 
 void CminusfBuilder::visit(ASTExpressionStmt &node) {
     node.expression->accept(*this);
+    is_retstmt = false;
 
  }
 
@@ -177,19 +198,37 @@ void CminusfBuilder::visit(ASTSelectionStmt &node) {
     builder->set_insert_point(trueBB);
     node.if_statement->accept(*this);
     if(node.else_statement == nullptr){
-        builder->create_br(falseBB);
-        builder->set_insert_point(falseBB);    
+        if(!is_retstmt){
+            builder->create_br(falseBB);
+            builder->set_insert_point(falseBB);    
+        }
+        else    
+            falseBB->erase_from_parent(); 
+        is_retstmt = false;
     }
     else{
         auto outBB = BasicBlock::create(module.get(), "", builder->get_insert_block()->get_parent());
-        builder->create_br(outBB);
+        bool is_retstmt1;
+        bool is_retstmt2;
+        //std::cout << is_retstmt << std::endl;
+        if(!is_retstmt){
+            //std::cout << "00" << std::endl;
+            builder->create_br(outBB);
+        }
+        if(is_retstmt)  {is_retstmt = false; is_retstmt1 = true;}
         builder->set_insert_point(falseBB);
         node.else_statement->accept(*this); 
-        builder->create_br(outBB);
-        builder->set_insert_point(outBB);   
+        if(!is_retstmt)
+            builder->create_br(outBB);
+        if(is_retstmt)  {is_retstmt = false; is_retstmt2 = true;}
+        if(!(is_retstmt1 && is_retstmt2))
+            builder->set_insert_point(outBB);  
+        else 
+            outBB->erase_from_parent(); 
     }
 
  }
+
 
 void CminusfBuilder::visit(ASTIterationStmt &node) {
     auto TyInt32 = Type::get_int32_type(module.get());
@@ -206,24 +245,35 @@ void CminusfBuilder::visit(ASTIterationStmt &node) {
             expr_val = FpToSiInst::create_fptosi(expr_val, TyInt32, builder->get_insert_block()); 
         }
     auto istrue = builder->create_icmp_ne(expr_val, CONST_INT(0));
+
     auto br = builder->create_cond_br(istrue, trueBB, falseBB);
 
     builder->set_insert_point(trueBB);
     node.statement->accept(*this);
-    builder->create_br(enterBB);
-
+    if(builder->get_insert_block()->get_terminator()==nullptr)
+        builder->create_br(enterBB);
+    
     builder->set_insert_point(falseBB);
-
+    whileBB = falseBB;
+    /*if(builder->get_insert_block()->get_parent()->get_name()=="main" && builder->get_insert_block()->get_terminator())
+        builder->create_void_ret();*/
+    is_retstmt = false;
  }
 
 void CminusfBuilder::visit(ASTReturnStmt &node) {
+    auto TyInt32 = Type::get_int32_type(module.get());
+    auto TyFloat = Type::get_float_type(module.get());
     if(node.expression == nullptr)
         builder->create_void_ret();
     else{
         node.expression->accept(*this);
+        if(cur_retTy->is_float_type() && type == TYPE_INT)
+            val = SiToFpInst::create_sitofp(val, TyFloat, builder->get_insert_block());
+        else if(cur_retTy->is_integer_type() && type == TYPE_FLOAT)
+            val = FpToSiInst::create_fptosi(val, TyInt32, builder->get_insert_block());
         auto ret = builder->create_ret(val);
     }
-        
+    is_retstmt = true;    
  }
 
 void CminusfBuilder::visit(ASTVar &node) { 
@@ -235,11 +285,14 @@ void CminusfBuilder::visit(ASTVar &node) {
         if(isleftvalue.find(node.id)->second){                                    //there's no value in the alloca, should store first
             val = var;
             isleftvalue[node.id] = false;
-            type = val->get_type()->get_pointer_element_type()==TyInt32 ? TYPE_INT : TYPE_FLOAT;
+            type = (val->get_type()->get_pointer_element_type()==TyInt32) ? TYPE_INT : TYPE_FLOAT;
         }
         else{
-            val = builder->create_load(var);
-            type = val->get_type()==TyInt32 ? TYPE_INT : TYPE_FLOAT;             
+            if(var->get_type()->get_pointer_element_type()->is_array_type())
+                val = builder->create_gep(var, {CONST_INT(0), CONST_INT(0)});
+            else
+                val = builder->create_load(var);
+            type = (val->get_type()==TyInt32) ? TYPE_INT : TYPE_FLOAT;           
         }
     }
     else{
@@ -265,7 +318,12 @@ void CminusfBuilder::visit(ASTVar &node) {
             builder->create_ret(CONST_INT(0));*/
 
         builder->set_insert_point(notnegBB);
-        var = builder->create_gep(var, {CONST_INT(0), expr_val});
+        if(var->get_type()->get_pointer_element_type()->is_pointer_type()){
+            auto load_var = builder->create_load(var);
+            var = builder->create_gep(load_var,{expr_val});
+        }
+        else
+            var = builder->create_gep(var, {CONST_INT(0),expr_val});
 
         if(isleftvalue.find(node.id)->second){                                    //there's no value in the alloca, should store first
             val = var;
@@ -288,15 +346,19 @@ void CminusfBuilder::visit(ASTAssignExpression &node) {
     isleftvalue[node.var->id] = true;
     node.var->accept(*this);
     auto var_val = val;
-    auto var_type = type;
-    if(var_type != expr_type){                              
-        if(var_type == TYPE_INT)
-            expr_val = FpToSiInst::create_fptosi(expr_val, TyInt32, builder->get_insert_block());
-        else if(var_type == TYPE_FLOAT)
-            expr_val = SiToFpInst::create_sitofp(expr_val, TyFloat, builder->get_insert_block());
+    auto var_type = type; 
+    //std::cout << (var_type == TYPE_INT) << std::endl;                            
+    if(val->get_type()->get_pointer_element_type()->is_integer_type() && expr_type == TYPE_FLOAT)
+        expr_val = FpToSiInst::create_fptosi(expr_val, TyInt32, builder->get_insert_block());
+    else if(val->get_type()->get_pointer_element_type()->is_float_type() && expr_type == TYPE_INT)
+        expr_val = SiToFpInst::create_sitofp(expr_val, TyFloat, builder->get_insert_block());
+    if(var_val->get_type()->get_pointer_element_type()->is_pointer_type()){
+        auto load_var = builder->create_load(var_val);
+        var_val = builder->create_gep(load_var,{CONST_INT(0)});
     }
     builder->create_store(expr_val, var_val);
     val = expr_val;
+    type = var_type;
 }
 
 
@@ -480,23 +542,30 @@ void CminusfBuilder::visit(ASTCall &node) {
             break;
         }
     }
+    auto i = 0;
     for (auto iter = node.args.begin(); iter != node.args.end(); iter++) {
         (*iter)->accept(*this);         //(*) is needed!!!
         /*if(FunTy->get_name() == "output" && type == TYPE_FLOAT){        //attention that output()'s param type is int!!
             auto fptosi = FpToSiInst::create_fptosi(val, TyInt32, builder->get_insert_block());
             args.push_back(fptosi);
         }*/
-        if(FunTy->get_function_type()->get_param_type(0)->is_integer_type() && type == TYPE_FLOAT){
-            auto fptosi = FpToSiInst::create_fptosi(val, TyInt32, builder->get_insert_block());
-            args.push_back(fptosi);
-        }
-        else if(FunTy->get_function_type()->get_param_type(0)->is_float_type() && type == TYPE_INT){
-            auto sitofp = SiToFpInst::create_sitofp(val, TyFloat, builder->get_insert_block());
-            args.push_back(sitofp);
+        //auto num = FunTy->get_num_of_args();
+        if(FunTy->get_num_of_args() > 0 ){
+            if(FunTy->get_function_type()->get_param_type(i)->is_integer_type() && val->get_type()->is_float_type()){
+                //std::cout << type << std::endl;
+                auto fptosi = FpToSiInst::create_fptosi(val, TyInt32, builder->get_insert_block());
+                args.push_back(fptosi);
+            }
+            else if(FunTy->get_function_type()->get_param_type(i)->is_float_type() && val->get_type()->is_integer_type()){
+                auto sitofp = SiToFpInst::create_sitofp(val, TyFloat, builder->get_insert_block());
+                args.push_back(sitofp);
+            } 
+            else args.push_back(val); 
         } 
-        else args.push_back(val);   
+        i++;
     }
     auto call = builder->create_call(FunTy, args);                                      //what's the reason for segmentation default
     val = call;
+    type = call->get_type()->is_float_type() ? TYPE_FLOAT : TYPE_INT;
     module->pop_function();
  }
