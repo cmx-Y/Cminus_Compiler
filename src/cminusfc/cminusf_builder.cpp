@@ -15,8 +15,9 @@
 Value *cur_arg;
 std::vector<Function> AllFun;   //vector of all function, used for call
 Type *cur_retTy;
-bool is_retstmt;
+bool is_retstmt = false;
 std::map<std::string,bool> isleftvalue;
+BasicBlock* whileBB;
 /*
  * use CMinusfBuilder::Scope to construct scopes
  * scope.enter: enter a new scope
@@ -159,11 +160,15 @@ void CminusfBuilder::visit(ASTCompoundStmt &node) {
     for(auto cur_statement : node.statement_list){
         cur_statement->accept(*this);
     }
+    if(*(builder->get_insert_block()->get_pre_basic_blocks().end()) == whileBB)
+        whileBB->add_instruction(builder->create_void_ret());
     scope.exit();
+    is_retstmt = false;
  }
 
 void CminusfBuilder::visit(ASTExpressionStmt &node) {
     node.expression->accept(*this);
+    is_retstmt = false;
 
  }
 
@@ -183,14 +188,21 @@ void CminusfBuilder::visit(ASTSelectionStmt &node) {
     builder->set_insert_point(trueBB);
     node.if_statement->accept(*this);
     if(node.else_statement == nullptr){
-        builder->create_br(falseBB);
-        builder->set_insert_point(falseBB);    
+        if(!is_retstmt){
+            builder->create_br(falseBB);
+            builder->set_insert_point(falseBB);    
+        }
+        else    
+            falseBB->erase_from_parent(); 
+        is_retstmt = false;
     }
     else{
         auto outBB = BasicBlock::create(module.get(), "", builder->get_insert_block()->get_parent());
         bool is_retstmt1;
         bool is_retstmt2;
+        //std::cout << is_retstmt << std::endl;
         if(!is_retstmt){
+            //std::cout << "00" << std::endl;
             builder->create_br(outBB);
         }
         if(is_retstmt)  {is_retstmt = false; is_retstmt1 = true;}
@@ -223,14 +235,19 @@ void CminusfBuilder::visit(ASTIterationStmt &node) {
             expr_val = FpToSiInst::create_fptosi(expr_val, TyInt32, builder->get_insert_block()); 
         }
     auto istrue = builder->create_icmp_ne(expr_val, CONST_INT(0));
+
     auto br = builder->create_cond_br(istrue, trueBB, falseBB);
 
     builder->set_insert_point(trueBB);
     node.statement->accept(*this);
-    builder->create_br(enterBB);
-
+    if(builder->get_insert_block()->get_terminator()==nullptr)
+        builder->create_br(enterBB);
+    whileBB = falseBB;
     builder->set_insert_point(falseBB);
-
+    
+    /*if(builder->get_insert_block()->get_parent()->get_name()=="main" && builder->get_insert_block()->get_terminator())
+        builder->create_void_ret();*/
+    is_retstmt = false;
  }
 
 void CminusfBuilder::visit(ASTReturnStmt &node) {
@@ -515,27 +532,30 @@ void CminusfBuilder::visit(ASTCall &node) {
             break;
         }
     }
-
+    auto i = 0;
     for (auto iter = node.args.begin(); iter != node.args.end(); iter++) {
         (*iter)->accept(*this);         //(*) is needed!!!
         /*if(FunTy->get_name() == "output" && type == TYPE_FLOAT){        //attention that output()'s param type is int!!
             auto fptosi = FpToSiInst::create_fptosi(val, TyInt32, builder->get_insert_block());
             args.push_back(fptosi);
         }*/
+        //auto num = FunTy->get_num_of_args();
         if(FunTy->get_num_of_args() > 0 ){
-            if(FunTy->get_function_type()->get_param_type(0)->is_integer_type() && val->get_type()->is_float_type()){
+            if(FunTy->get_function_type()->get_param_type(i)->is_integer_type() && val->get_type()->is_float_type()){
                 //std::cout << type << std::endl;
                 auto fptosi = FpToSiInst::create_fptosi(val, TyInt32, builder->get_insert_block());
                 args.push_back(fptosi);
             }
-            else if(FunTy->get_function_type()->get_param_type(0)->is_float_type() && val->get_type()->is_integer_type()){
+            else if(FunTy->get_function_type()->get_param_type(i)->is_float_type() && val->get_type()->is_integer_type()){
                 auto sitofp = SiToFpInst::create_sitofp(val, TyFloat, builder->get_insert_block());
                 args.push_back(sitofp);
             } 
-            else args.push_back(val);  
+            else args.push_back(val); 
         } 
+        i++;
     }
     auto call = builder->create_call(FunTy, args);                                      //what's the reason for segmentation default
     val = call;
+    type = call->get_type()->is_float_type() ? TYPE_FLOAT : TYPE_INT;
     module->pop_function();
  }
