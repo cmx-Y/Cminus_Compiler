@@ -10,6 +10,7 @@
 class LoopInvHoist : public Pass {
 public:
     LoopInvHoist(Module *m) : Pass(m) {}
+    bool is_inv_operand(Value* operand);
 
     void run() override;
 };

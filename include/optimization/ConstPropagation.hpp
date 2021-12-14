@@ -11,12 +11,12 @@
 #include <stack>
 #include <unordered_map>
 
-// tips: Áî®Êù•Âà§Êñ≠valueÊòØÂê¶‰∏∫ConstantFP/ConstantInt
+// tips: ”√¿¥≈–∂œvalue «∑ÒŒ™ConstantFP/ConstantInt
 ConstantFP* cast_constantfp(Value *value);
 ConstantInt* cast_constantint(Value *value);
 
 
-// tips: ConstFloderÁ±ª
+// tips: ConstFloder¿‡
 
 class ConstFolder
 {
@@ -26,7 +26,33 @@ public:
         Instruction::OpID op,
         ConstantInt *value1,
         ConstantInt *value2);
-    // ...
+    ConstantFP *fcompute(
+        Instruction::OpID op,
+        ConstantFP *value1,
+        ConstantFP *value2
+    );
+    ConstantInt *fticompute(
+        Instruction::OpID op,
+        ConstantFP *value1
+    );
+    ConstantFP *itfcompute(
+        Instruction::OpID op,
+        ConstantInt *value1
+    );
+    ConstantInt *zextcompute(
+        Instruction::OpID op,
+        ConstantInt *value1
+    );
+    ConstantInt *cmpcompute(
+        CmpInst::CmpOp op,
+        ConstantInt *value1,
+        ConstantInt *value2
+    );
+    ConstantInt *fcmpcompute(
+        FCmpInst::CmpOp op,
+        ConstantFP *value1,
+        ConstantFP *value2
+    );
 private:
     Module *module_;
 };
@@ -35,6 +61,7 @@ class ConstPropagation : public Pass
 {
 public:
     ConstPropagation(Module *m) : Pass(m) {}
+    void visit_bb(BasicBlock* bb);
     void run();
 };
 
