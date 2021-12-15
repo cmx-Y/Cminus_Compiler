@@ -22,7 +22,7 @@ public:
     std::string print();
 private:
     Function *func_;
-    std::map<BasicBlock *, std::set<Value *>> live_in, live_out;
+    std::map<BasicBlock *, std::set<std::string>> live_in, live_out;
 };
 
 #endif

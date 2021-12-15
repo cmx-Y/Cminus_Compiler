@@ -8,7 +8,7 @@
 #include "Type.h"
 #include "ast.hpp"
 #include <map>
-extern std::vector<Function> AllFun;
+//extern std::vector<Function> AllFun;
 
 
 class Scope {
@@ -66,7 +66,7 @@ public:
                     input_type,
                     "input",
                     module.get());
-        AllFun.push_back(*input_fun);
+        //AllFun.push_back(*input_fun);
 
         std::vector<Type *> output_params;
         output_params.push_back(TyInt32);
@@ -76,7 +76,7 @@ public:
                     output_type,
                     "output",
                     module.get());
-        AllFun.push_back(*output_fun);
+        //AllFun.push_back(*output_fun);
 
         std::vector<Type *> output_float_params;
         output_float_params.push_back(TyFloat);
@@ -86,7 +86,7 @@ public:
                     output_float_type,
                     "outputFloat",
                     module.get());
-        AllFun.push_back(*output_float_fun);
+        //AllFun.push_back(*output_float_fun);
 
         auto neg_idx_except_type = FunctionType::get(TyVoid, {});
         auto neg_idx_except_fun =
@@ -94,7 +94,7 @@ public:
                     neg_idx_except_type,
                     "neg_idx_except",
                     module.get());
-        AllFun.push_back(*neg_idx_except_fun);
+        //AllFun.push_back(*neg_idx_except_fun);
 
         scope.enter();
         scope.push("input", input_fun);
@@ -126,8 +126,8 @@ private:
 
     IRBuilder *builder;
     Scope scope;
-    Value *val;
-    CminusType type;
+    //Value *val;
+    //CminusType type;
     std::unique_ptr<Module> module;
 };
 #endif
