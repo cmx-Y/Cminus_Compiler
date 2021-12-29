@@ -8,6 +8,23 @@
 class Type;
 class Value;
 
+//eg1.   %op7 = add i32 %op5, %op6
+//  %op5.use_list: size 1 
+//                 use_val_name op7
+//                 use_no       0
+//  %op6.use_list: size 1
+//                 use_val_name op7
+//                 use_no       1
+
+//eg2.  %op7 = add i32 2, 3
+//      %op10 = add i32 %op7, 4
+//first %op7'use_list: size 1
+//                     use_val_name op10
+//                     use_no       0
+//second op7'use_list: size 1
+//                     use_val_name op10
+//                     use_no       0
+
 struct Use
 {
     Value *val_;
@@ -43,7 +60,7 @@ public:
     virtual std::string print() = 0;
 private:
     Type *type_;
-    std::list<Use> use_list_;   // who use this value
+    std::list<Use> use_list_;   // (which instr)who use this value
     std::string name_;    // should we put name field here ?
 };
 

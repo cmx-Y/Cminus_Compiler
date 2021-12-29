@@ -1,0 +1,59 @@
+                    std::cout << "===l_SDNode===" << std::endl;
+                    std::cout << "l_op_id: " << l_SDNode->get_node_op() << std::endl;
+                    std::cout << "l_type_id: " << l_SDNode->get_node_type()->get_type_id() << std::endl;
+                    std::cout << "l_num_operands: " << l_SDNode->get_num_operands() << std::endl;
+                    if(l_SDNode->get_num_operands() != 0){
+                        for(int i = 0; i < l_SDNode->get_num_operands(); i++){
+                            auto operandi = l_SDNode->get_operand(i);
+                            auto operand_node = operandi->get_val()->get_node();
+                            std::cout << "operand" << i << " " << operand_node->get_node_name() << std::endl;
+                        }
+                    }
+                    std::cout << "l_num_users: " << l_SDNode->get_num_users() << std::endl;
+                    if(l_SDNode->get_num_users() != 0){
+                        for(int i = 0; i < l_SDNode->get_num_users(); i++){
+                            auto usei = l_SDNode->get_use(i);
+                            std::cout << "user" << i << " " << usei->get_user()->get_node_name() << " ";
+                            std::cout << "no " << usei->get_val()->get_res_no() << std::endl;
+                        }
+                    }
+                    std::cout << "l_num_vals: " << l_SDNode->get_num_values() << std::endl;
+                    std::cout << "l_node_name:" << l_SDNode->get_node_name() << std::endl;
+                        
+                        
+                    std::cout << "===r_SDNode===" << std::endl;
+                    std::cout << "r_op_id: " << r_SDNode->get_node_op() << std::endl;
+                    std::cout << "r_type_id: " << r_SDNode->get_node_type()->get_type_id() << std::endl;
+                    std::cout << "r_num_operands: " << r_SDNode->get_num_operands() << std::endl;
+                    std::cout << "r_num_users: " << r_SDNode->get_num_users() << std::endl;
+                    if(r_SDNode->get_num_users() != 0){
+                        for(int i = 0; i < r_SDNode->get_num_users(); i++){
+                            auto usei = r_SDNode->get_use(i);
+                            std::cout << "user" << i << " " << usei->get_user()->get_node_name() << " ";
+                            std::cout << "no " << usei->get_val()->get_res_no() << std::endl;
+                        }
+                    }
+                    std::cout << "r_num_vals: " << r_SDNode->get_num_values() << std::endl;
+                    std::cout << "r_node_name:" << r_SDNode->get_node_name() << std::endl;
+
+                    std::cout << "===op_SDNode===" << std::endl;
+                    std::cout << "op_op_id: " << op_SDNode->get_node_op() << std::endl;
+                    std::cout << "op_type_id: " << op_SDNode->get_node_type()->get_type_id() << std::endl;
+                    std::cout << "op_num_opeopands: " << op_SDNode->get_num_operands() << std::endl;
+                    if(op_SDNode->get_num_operands() != 0){
+                        for(int i = 0; i < op_SDNode->get_num_operands(); i++){
+                            auto operandi = op_SDNode->get_operand(i);
+                            auto operand_node = operandi->get_val()->get_node();
+                            std::cout << "operand" << i << " " << operand_node->get_node_name() << std::endl;
+                        }
+                    }
+                    std::cout << "op_num_users: " << op_SDNode->get_num_users() << std::endl;
+                    if(op_SDNode->get_num_users() != 0){
+                        for(int i = 0; i < op_SDNode->get_num_users(); i++){
+                            auto usei = op_SDNode->get_use(i);
+                            std::cout << "user" << i << " " << usei->get_user()->get_node_name() << " ";
+                            std::cout << "no " << usei->get_val()->get_res_no() << std::endl;
+                        }
+                    }
+                    std::cout << "op_num_vals: " << op_SDNode->get_num_values() << std::endl;
+                    std::cout << "op_node_name:" << op_SDNode->get_node_name() << std::endl;

@@ -6,6 +6,7 @@ add_executable(
 
 target_link_libraries(
     cminusfc
+    BACK_lib
     OP_lib
     IR_lib
     common

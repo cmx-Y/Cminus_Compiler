@@ -7,6 +7,8 @@
 #include "LoopInvHoist.hpp"
 #include "ActiveVars.hpp"
 #include "ConstPropagation.hpp"
+#include "SelDAGNodes.hpp"
+#include "AsmPrinter.hpp"
 #include <iostream>
 #include <fstream>
 #include <memory>
@@ -118,6 +120,12 @@ int main(int argc, char **argv) {
         PM.add_pass<LoopInvHoist>(true);
     }
     PM.run();
+
+    SelDAGBuilder sel_dag_builder(m.get());
+    sel_dag_builder.run();
+    AsmPrinter asm_printer;
+    asm_printer.visit(*((BinarySDNode *)sel_dag_builder.get_dag_root()));
+
     
     auto IR = m->print();
 

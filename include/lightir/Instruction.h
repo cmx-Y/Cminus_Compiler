@@ -38,8 +38,9 @@ public:
         getelementptr, 
         zext, // zero extend
         fptosi,
-        sitofp
+        sitofp,
         // float binary operators Logical operators
+        nop
 
     };
     // create instruction, auto insert to bb
