@@ -121,12 +121,22 @@ int main(int argc, char **argv) {
     }
     PM.run();
 
+    std::string ASM;
+    ASM += "\tjal main\n";
     SelDAGBuilder sel_dag_builder(m.get());
     sel_dag_builder.run();
     AsmPrinter asm_printer;
-    asm_printer.visit(*((BinarySDNode *)sel_dag_builder.get_dag_root()));
-
+    for(int i = 0; i < sel_dag_builder.get_root_num(); i++){
+        ASM += asm_printer.visit( *((RootSDNode*)(sel_dag_builder.get_root(i))) );
+    }
+    std::cout << ASM;
     
+    std::ofstream asm_file;
+    std::string asm_fname = target_path+".s";
+    asm_file.open(asm_fname, std::ios::out);
+    asm_file << ASM;
+    asm_file.close();
+
     auto IR = m->print();
 
     std::ofstream output_stream;

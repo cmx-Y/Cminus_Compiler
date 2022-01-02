@@ -58,8 +58,16 @@ void SelDAGBuilder::run(){
     auto func_list = m_->get_functions();
     for(auto func : func_list)
     {
+        if(func->get_name() == "main"){
+            auto func_dag_root = new RootSDNode();
+            auto prolog = new PrologSDNode(func->get_name());
+            func_dag_root->set_chain_depen(prolog);
+            _dag_root_list.push_back(func_dag_root);
+        }
+
         for(auto bb : func->get_basic_blocks())
         {
+            auto bb_dag_root = new RootSDNode();
             for(auto instr : bb->get_instructions())
             {
                 if(instr->isBinary()){
@@ -97,13 +105,22 @@ void SelDAGBuilder::run(){
                     l_SDNode->add_use(op_SDNode->get_operand(0));
                     op_SDNode->add_operand(r_SDNode, 1, op_SDNode);
                     r_SDNode->add_use(op_SDNode->get_operand(1));
-                    _dag_root = op_SDNode;
+                    bb_dag_root->set_chain_depen(op_SDNode);
                 }
                 else if(instr->isTerminator()){
+                    if(instr->is_ret()){
+                        auto ret_instr = (ReturnInst *)instr;
+                        if(ret_instr->is_void_ret()){
+                            auto ret_SDNode = new ReturnSDNode();
+                            ret_SDNode->set_chain_depen(bb_dag_root->get_chain_depen());
+                            bb_dag_root->set_chain_depen(ret_SDNode);
+                            _dag_root_list.push_back(bb_dag_root);
+                        }
+                    }
+                    else if(instr->is_br()){
 
-                }
-                else if(instr->is_phi()){
-
+                    }
+                    //create dag root, and push it into stack
                 }
                 //etc. else if...
             }
@@ -111,4 +128,16 @@ void SelDAGBuilder::run(){
     }
 }
 
-void BinarySDNode::accept(SDNodeVisitor &visitor) { visitor.visit(*this);}
+SDNode* SelDAGBuilder::get_root(int no){
+    int i = 0;
+    for(auto it = _dag_root_list.begin(); it != _dag_root_list.end(); it++, i++){
+        if(i == no) return *it;
+    }
+    return nullptr;
+}
+
+
+std::string BinarySDNode::accept(SDNodeVisitor &visitor) { return visitor.visit(*this);}
+std::string PrologSDNode::accept(SDNodeVisitor &visitor) { return visitor.visit(*this);}
+std::string RootSDNode::accept(SDNodeVisitor &visitor) { return visitor.visit(*this);}
+std::string ReturnSDNode::accept(SDNodeVisitor &visitor) { return visitor.visit(*this);}

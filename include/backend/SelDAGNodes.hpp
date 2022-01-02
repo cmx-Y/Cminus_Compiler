@@ -14,22 +14,21 @@
 //      由于DAG是非线性的，所以需要visitor pattern来实现assemble language print
 //idea: 之后在DAG上可能需要写的pass：合法化，指令选择，寄存器分配
 
-//首先保证正确性，而且光是保持正确性，工作量就已经不小了！倘若没有正确性，一切都是空中楼阁！！
+//main trouble: return void 在DAG中的连边关系怎么搞？？？
 
-//TODO: 如何得到符合规范且能正确运行的riscv代码
-//      打印出双加法的riscv代码
-//      写出AsmPrinter 的 visitor pattern框架   ✔
-//      边建DAG，边新建派生类
-//      通过第一个测试样例！
-//      回顾visitor pattern，明确SDBuild与ASMPrinter过程需采用的技术路线    ✔
-//      弄清risc-v汇编规范
-//      打印出对应的risc-v汇编代码
+//TODO: 通过llc观察void_return如何放进DAG
+//      SelectionDAGBuilder中加入all_dag_roots
+//      SelectionDAGBuilder::run中写return_void
+//      打印出第一个测试样例的RISC-v代码
 
+class RISCV_td;
 class SDUse;
 class SDValue;
 class SDNode;
 class BinarySDNode;
-class RISCV_td;
+class RootSDNode;
+class PrologSDNode;
+class ReturnSDNode;
 
 
 class RISCV_td{
@@ -104,16 +103,20 @@ private:
 
 class SDNodeVisitor{
 public:
-    virtual void visit(BinarySDNode &node) = 0;
+    virtual std::string visit(BinarySDNode &node) = 0;
+    virtual std::string visit(PrologSDNode &node) = 0;
+    virtual std::string visit(RootSDNode &node) = 0;
+    virtual std::string visit(ReturnSDNode &node) = 0;
 };
 
 class SDNode{
 public:
+    SDNode() = default;
     SDNode(Type *node_type, Instruction::OpID node_op);
     SDNode(Type *node_type);
     virtual ~SDNode();
 
-    virtual void accept(SDNodeVisitor &visitor) { }
+    virtual std::string accept(SDNodeVisitor &visitor) { }
 
     void add_value(Value *val);
     void add_operand(SDNode *node, int res_no, SDNode *user);
@@ -129,8 +132,10 @@ public:
     int get_num_values() { return _num_values;}
     int get_num_users() { return _use_list.size();}
     std::string get_node_name() { return _node_name;}
+    SDNode *get_chain_depen() { return chain;}
 
     void set_node_name(std::string name) { _node_name = name;}
+    void set_chain_depen(SDNode *be_pointed) { chain = be_pointed;}
     
 private:
     Type *_node_type;
@@ -142,8 +147,17 @@ private:
     std::list<Value*> _value_list;    //TODO: 为什么有多个输出？？
     int _num_values = 0;
     std::list<SDUse*> _use_list; // 引用该节点的链表
+    SDNode* chain;  //chain dependence
 
     //TODO: chain dependence, glue dependence
+};
+
+class RootSDNode : public SDNode{
+public:
+    virtual std::string accept(SDNodeVisitor &visitor) override final;
+
+private:
+
 };
 
 class BinarySDNode : public SDNode{
@@ -159,10 +173,36 @@ public:
     BinarySDNode(Type *node_type) : SDNode(node_type) { }
     BinarySDNode(Type *node_type, Instruction::OpID node_op) : SDNode(node_type, node_op) { }
 
-    virtual void accept(SDNodeVisitor &visitor) override final;
+    virtual std::string accept(SDNodeVisitor &visitor) override final;
+
+    int get_stack_addr() { return _stack_addr;}
 
 private:
     RISCV_td::REGISTER _reg;
+    int _stack_addr;
+};
+
+class PrologSDNode : public SDNode{
+public:
+    PrologSDNode() = default;
+    PrologSDNode(std::string func_name) : _func_name(func_name) { }
+    
+    virtual std::string accept(SDNodeVisitor &visitor) override final;
+
+    std::string get_func_name() { return _func_name;}
+    int get_frame_size() { return _frame_size;}
+private:
+    std::string _func_name;
+    int _frame_size = 32;
+    int _arg_num;
+};
+
+class ReturnSDNode : public SDNode{
+public:
+    virtual std::string accept(SDNodeVisitor &visitor) override final;
+
+private:
+
 };
 
 class RegSDNode : public SDNode{
@@ -188,8 +228,15 @@ public:
     SelDAGBuilder(Module *m) : m_(m) { }
     void run();
     SDNode *get_dag_root() { return _dag_root;}
+    int get_root_num() { return _dag_root_list.size();}
+    SDNode* get_root(int no);
+    void add_dag_root(RootSDNode *root) { _dag_root_list.push_back(root);}
+    
+    
 
 private:
+    //vector,dag_root_list
+    std::list<SDNode *> _dag_root_list;
     SDNode *_dag_root;
     Module *m_;
 };

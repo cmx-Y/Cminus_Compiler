@@ -7,7 +7,10 @@
 
 class AsmPrinter : public SDNodeVisitor{
 public:
-    virtual void visit(BinarySDNode &node) override final;
+    virtual std::string visit(BinarySDNode &node) override final;
+    virtual std::string visit(PrologSDNode &node) override final;
+    virtual std::string visit(RootSDNode &node) override final;
+    virtual std::string visit(ReturnSDNode &node) override final;
 
 private:
 
