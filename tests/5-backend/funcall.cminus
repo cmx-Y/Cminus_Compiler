@@ -1,0 +1,16 @@
+int plus(int a, int b){
+    int c;
+    c = a + b;
+    return c;
+}
+
+void main(void){
+    int a;
+    int b;
+    int c;
+    a = 2 + 3;
+    b = a + 4;
+    c = plus(a, b);
+    output(c);
+    return;
+}

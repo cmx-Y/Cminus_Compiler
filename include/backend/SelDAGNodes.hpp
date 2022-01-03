@@ -6,19 +6,23 @@
 #include "Instruction.h"
 #include "Type.h"
 
-//idea：由于Instruction类具有多个派生类，所以可以利用函数的多态
-//      对不同的指令进行不同的BuildSDNode
-//idea: AsmPrinter好像得用访问者模式才能实现，现在我得探索一下怎么设计派生类
-//      /include/llvm/CodeGen/SelectionDAGNodes.h     line 1253
-//idea: 由于Instruction_list是线性的，所以可以直接用一堆if-else来建立DAG
-//      由于DAG是非线性的，所以需要visitor pattern来实现assemble language print
-//idea: 之后在DAG上可能需要写的pass：合法化，指令选择，寄存器分配
+//idea: 在SelectionDAG上需要写的pass：
+//      基础pass：合法化&&指令选择
+//      扩展pass：寄存器分配
 
-//main trouble: return void 在DAG中的连边关系怎么搞？？？
+//idea: 在每个func上写一个pass，计算每个函数所需的最大栈空间(frame_size)
+//      但以目前的情况来看，可以先分配足够大的栈空间
 
-//TODO: 通过llc观察void_return如何放进DAG
-//      SelectionDAGBuilder中加入all_dag_roots
-//      SelectionDAGBuilder::run中写return_void
+//hit:  about output
+//      need system call, which system call is specified by a7
+//      when call PrintInt, argument in a7 is 1
+//      and then I should use ecall to wake system call
+
+//TODO: 判断某个操作数是否是常数，如果是常数，不用分配栈空间，直接mv进寄存器    ✔
+//      完成add指令                                                         ✔
+//      打印函数时要在prologue中加上函数参数分配                              ✔
+//      要完成output函数                                                    ✔
+//      (完成output函数，不仅能解决怎么输出的问题，还能解决函数调用的问题)     ✔
 //      打印出第一个测试样例的RISC-v代码
 
 class RISCV_td;
@@ -29,6 +33,7 @@ class BinarySDNode;
 class RootSDNode;
 class PrologSDNode;
 class ReturnSDNode;
+class CallSDNode;
 
 
 class RISCV_td{
@@ -107,6 +112,7 @@ public:
     virtual std::string visit(PrologSDNode &node) = 0;
     virtual std::string visit(RootSDNode &node) = 0;
     virtual std::string visit(ReturnSDNode &node) = 0;
+    virtual std::string visit(CallSDNode &node) = 0;
 };
 
 class SDNode{
@@ -147,9 +153,9 @@ private:
     std::list<Value*> _value_list;    //TODO: 为什么有多个输出？？
     int _num_values = 0;
     std::list<SDUse*> _use_list; // 引用该节点的链表
-    SDNode* chain;  //chain dependence
+    SDNode* chain;  //chain dependency
 
-    //TODO: chain dependence, glue dependence
+    //TODO: chain dependency, glue dependency
 };
 
 class RootSDNode : public SDNode{
@@ -169,15 +175,29 @@ public:
         sub,
         subi,
     };  //这里的enum类型，为ASMPrinter而服务，即具体的指令选择
+        //不要选择了，我直接暂时全用add！
 
+    BinarySDNode() = default;
     BinarySDNode(Type *node_type) : SDNode(node_type) { }
     BinarySDNode(Type *node_type, Instruction::OpID node_op) : SDNode(node_type, node_op) { }
 
     virtual std::string accept(SDNodeVisitor &visitor) override final;
 
+    bool is_const() { return _is_const;}
+    bool is_call_assign() { return _is_call_assign;}
+
     int get_stack_addr() { return _stack_addr;}
+    int get_const_val() { return _const_val;}
+    
+    void set_is_call_assign() { _is_call_assign = true;}
+    void set_is_const() { _is_const = true;}
+    void set_const_val(int const_val) { _const_val = const_val;}
+    void set_stack_addr(int stack_addr) { _stack_addr = stack_addr;}
 
 private:
+    bool _is_call_assign = false;
+    bool _is_const = false;
+    int _const_val = -1;
     RISCV_td::REGISTER _reg;
     int _stack_addr;
 };
@@ -189,19 +209,57 @@ public:
     
     virtual std::string accept(SDNodeVisitor &visitor) override final;
 
+    void set_arg_num(int arg_num) { _arg_num = arg_num;}
+    int  get_arg_num() { return _arg_num;}
     std::string get_func_name() { return _func_name;}
     int get_frame_size() { return _frame_size;}
 private:
     std::string _func_name;
     int _frame_size = 32;
-    int _arg_num;
+    int _arg_num = 0;
 };
 
 class ReturnSDNode : public SDNode{
 public:
     virtual std::string accept(SDNodeVisitor &visitor) override final;
+    void set_frame_size(int frame_size) { _frame_size = frame_size;}
+    int get_frame_size() { return _frame_size;}
+    bool get_should_exit() { return _should_exit;}
+    void set_should_exit() { _should_exit = true;}
+    bool get_has_ret_val() { return _has_ret_val;}
+    void set_has_ret_val() { _has_ret_val = true;}
+    int get_ret_val_addr() { return _ret_val_addr;}
+    void set_ret_val_addr(int addr) { _ret_val_addr = addr;}
 
 private:
+    int _frame_size;
+    bool _should_exit = false;
+    bool _has_ret_val = false;
+    int _ret_val_addr;
+};
+
+class CallSDNode : public SDNode{
+public:
+
+    virtual std::string accept(SDNodeVisitor &visitor) override final;
+
+    void set_arg_num(int arg_num) { _arg_num = arg_num;}
+    void set_func_name(std::string func_name) { _func_name = func_name;}
+    void add_arg_addr(int addr) { _arg_addr_list.push_back(addr);}
+    void set_ret_user_addr(int addr) { _ret_user_addr = addr;}
+
+    std::string get_func_name() { return _func_name;}
+    int get_arg_num() { return _arg_num;}
+    int get_argi_addr(int no);
+    int get_ret_user_addr() { return _ret_user_addr;}
+
+
+private:
+    //要注意一下有关返回值的问题
+    int _ret_user_addr;
+    std::vector<int> _arg_addr_list;
+    std::string _func_name;
+    int _arg_num;
 
 };
 
@@ -227,7 +285,6 @@ class SelDAGBuilder{
 public:
     SelDAGBuilder(Module *m) : m_(m) { }
     void run();
-    SDNode *get_dag_root() { return _dag_root;}
     int get_root_num() { return _dag_root_list.size();}
     SDNode* get_root(int no);
     void add_dag_root(RootSDNode *root) { _dag_root_list.push_back(root);}
@@ -237,7 +294,6 @@ public:
 private:
     //vector,dag_root_list
     std::list<SDNode *> _dag_root_list;
-    SDNode *_dag_root;
     Module *m_;
 };
 

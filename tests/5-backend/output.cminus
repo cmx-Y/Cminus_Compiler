@@ -1,0 +1,8 @@
+void main(void){
+    int a;
+    int e;
+    a = 2 + 3;
+    e = a + 4;
+    output(e);
+    return;
+}
